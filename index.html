@@ -1,0 +1,1230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="theme-color" content="#7c0a1e" />
+  <title>Main Line Restaurant Week — Interactive Map & Menus</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --burgundy: #8b0d27;
+      --burgundy-dark: #63071a;
+      --burgundy-light: #fdf2f4;
+      --amber: #b45309;
+      --amber-light: #fef3c7;
+      --emerald: #047857;
+      --emerald-light: #d1fae5;
+      --slate-900: #0f172a;
+      --slate-800: #1e293b;
+      --slate-700: #334155;
+      --slate-600: #475569;
+      --slate-500: #64748b;
+      --slate-200: #e2e8f0;
+      --slate-100: #f1f5f9;
+      --slate-50: #f8fafc;
+      --safe-top: env(safe-area-inset-top, 0px);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100dvh;
+      overflow: hidden;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      color: var(--slate-900);
+      background: #e5e3df;
+    }
+
+    /* Full screen map */
+    #map {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+    }
+
+    .leaflet-control-attribution {
+      font-size: 9px !important;
+      background: rgba(255,255,255,0.7) !important;
+      backdrop-filter: blur(4px);
+    }
+
+    /* Floating Top Overlay */
+    .top-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 500;
+      padding: calc(var(--safe-top) + 8px) 10px 8px 10px;
+      background: linear-gradient(180deg, rgba(15,23,42,0.45) 0%, rgba(15,23,42,0.15) 75%, rgba(15,23,42,0) 100%);
+      pointer-events: none;
+    }
+
+    .top-overlay > * {
+      pointer-events: auto;
+    }
+
+    .search-card {
+      background: rgba(255, 255, 255, 0.96);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-radius: 16px;
+      padding: 8px 10px;
+      box-shadow: 0 6px 20px rgba(15, 23, 42, 0.16), 0 1px 3px rgba(0, 0, 0, 0.08);
+      max-width: 540px;
+      margin: 0 auto;
+    }
+
+    .brand-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 6px;
+      padding: 0 2px;
+    }
+
+    .brand-title {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--burgundy);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      letter-spacing: -0.01em;
+    }
+
+    .brand-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .mini-btn {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--slate-700);
+      background: var(--slate-100);
+      border: 1px solid var(--slate-200);
+      border-radius: 8px;
+      padding: 4px 8px;
+      text-decoration: none;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .mini-btn:active {
+      background: var(--slate-200);
+    }
+
+    .search-input-wrap {
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .search-icon {
+      position: absolute;
+      left: 11px;
+      color: var(--slate-500);
+      font-size: 14px;
+      pointer-events: none;
+    }
+
+    #searchInput {
+      width: 100%;
+      border: 1.5px solid var(--slate-200);
+      background: var(--slate-50);
+      border-radius: 11px;
+      padding: 8px 30px 8px 32px;
+      font-size: 14px;
+      font-family: inherit;
+      color: var(--slate-900);
+      outline: none;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    #searchInput:focus {
+      border-color: var(--burgundy);
+      background: #fff;
+    }
+
+    #clearSearchBtn {
+      position: absolute;
+      right: 88px;
+      background: var(--slate-200);
+      border: none;
+      color: var(--slate-700);
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      font-size: 13px;
+      line-height: 1;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+
+    #townSelect {
+      border: 1.5px solid var(--slate-200);
+      background: var(--slate-50);
+      border-radius: 11px;
+      padding: 8px 6px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--slate-700);
+      font-family: inherit;
+      max-width: 82px;
+      outline: none;
+      flex-shrink: 0;
+    }
+
+    /* Filter Pills Scroll Row */
+    .pills-scroll {
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      padding: 7px 2px 2px 2px;
+      max-width: 540px;
+      margin: 0 auto;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+    }
+    .pills-scroll::-webkit-scrollbar {
+      display: none;
+    }
+
+    .filter-pill {
+      flex-shrink: 0;
+      border: 1px solid rgba(226, 232, 240, 0.95);
+      background: rgba(255, 255, 255, 0.94);
+      backdrop-filter: blur(8px);
+      color: var(--slate-800);
+      padding: 6px 11px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 2px 6px rgba(15, 23, 42, 0.12);
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      transition: all 0.15s ease;
+    }
+
+    .filter-pill.active {
+      background: var(--burgundy);
+      color: #fff;
+      border-color: var(--burgundy);
+      box-shadow: 0 3px 10px rgba(139, 13, 39, 0.35);
+    }
+
+    /* Custom Map Pin Markers */
+    .custom-pin-wrap {
+      background: none;
+      border: none;
+    }
+
+    .pin-bubble {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 8px;
+      border-radius: 999px;
+      font-family: 'Inter', sans-serif;
+      font-size: 11px;
+      font-weight: 700;
+      color: #fff;
+      white-space: nowrap;
+      box-shadow: 0 3px 8px rgba(0, 0, 0, 0.28);
+      border: 2px solid #fff;
+      transform: translate(-50%, -50%);
+      transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.18s ease;
+      cursor: pointer;
+      position: relative;
+    }
+
+    .pin-bubble::after {
+      content: '';
+      position: absolute;
+      bottom: -6px;
+      left: 50%;
+      transform: translateX(-50%);
+      border-width: 5px 5px 0;
+      border-style: solid;
+      border-color: #fff transparent transparent;
+    }
+
+    .pin-tier-high { background: var(--burgundy); }
+    .pin-tier-mid  { background: #c2410c; }
+    .pin-tier-low  { background: var(--emerald); }
+
+    .pin-bubble.selected {
+      transform: translate(-50%, -62%) scale(1.22);
+      z-index: 9999 !important;
+      box-shadow: 0 0 0 4px rgba(139, 13, 39, 0.32), 0 8px 18px rgba(0,0,0,0.35);
+      background: #111827 !important;
+    }
+
+    .pin-rating {
+      font-size: 10px;
+      opacity: 0.92;
+      font-weight: 600;
+    }
+
+    /* Floating Bottom Trigger Bar */
+    .bottom-bar-float {
+      position: absolute;
+      bottom: calc(var(--safe-bottom) + 14px);
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 450;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      pointer-events: auto;
+    }
+
+    .list-toggle-btn {
+      background: var(--slate-900);
+      color: #fff;
+      border: none;
+      border-radius: 999px;
+      padding: 11px 18px;
+      font-size: 13px;
+      font-weight: 700;
+      font-family: inherit;
+      box-shadow: 0 6px 20px rgba(15, 23, 42, 0.32);
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+    }
+    .list-toggle-btn:active {
+      transform: scale(0.97);
+    }
+
+    .legend-pill {
+      background: rgba(255,255,255,0.95);
+      backdrop-filter: blur(8px);
+      border-radius: 999px;
+      padding: 8px 12px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--slate-700);
+      box-shadow: 0 4px 14px rgba(0,0,0,0.14);
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+
+    /* Bottom Sheet (Detail Card & List View) */
+    .bottom-sheet {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 600;
+      background: #fff;
+      border-radius: 22px 22px 0 0;
+      box-shadow: 0 -8px 30px rgba(15, 23, 42, 0.22);
+      max-height: 76dvh;
+      display: flex;
+      flex-direction: column;
+      transform: translateY(105%);
+      transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    .bottom-sheet.open {
+      transform: translateY(0);
+    }
+
+    .sheet-top-bar {
+      padding: 8px 14px 8px 14px;
+      border-bottom: 1px solid var(--slate-100);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+      user-select: none;
+    }
+
+    .drag-handle-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      cursor: pointer;
+    }
+
+    .drag-pill {
+      width: 38px;
+      height: 4px;
+      border-radius: 999px;
+      background: var(--slate-200);
+    }
+
+    .nav-arrows {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .icon-circle-btn {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      border: 1px solid var(--slate-200);
+      background: var(--slate-50);
+      color: var(--slate-700);
+      font-size: 15px;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+    .icon-circle-btn:active {
+      background: var(--slate-200);
+    }
+
+    .sheet-scroll-body {
+      overflow-y: auto;
+      padding: 12px 16px 18px 16px;
+      -webkit-overflow-scrolling: touch;
+      flex: 1;
+    }
+
+    /* Restaurant Detail Header */
+    .rest-header {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      margin-bottom: 12px;
+    }
+
+    .rest-thumb {
+      width: 68px;
+      height: 68px;
+      border-radius: 12px;
+      object-fit: cover;
+      background: var(--slate-100);
+      flex-shrink: 0;
+      border: 1px solid var(--slate-200);
+    }
+
+    .rest-title-block {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .rest-name {
+      font-size: 18px;
+      font-weight: 800;
+      color: var(--slate-900);
+      margin: 0 0 5px 0;
+      line-height: 1.2;
+      letter-spacing: -0.01em;
+    }
+
+    .badge-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      align-items: center;
+    }
+
+    .badge {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 8px;
+      border-radius: 6px;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+    }
+
+    .badge-town {
+      background: var(--slate-100);
+      color: var(--slate-800);
+    }
+
+    .badge-cuisine {
+      background: #f3e8ff;
+      color: #6b21a8;
+    }
+
+    .badge-rating {
+      background: #fef3c7;
+      color: #92400e;
+      font-weight: 700;
+    }
+
+    .rec-banner {
+      background: #fffbeb;
+      border-left: 3.5px solid #f59e0b;
+      padding: 8px 11px;
+      border-radius: 6px 10px 10px 6px;
+      font-size: 12.5px;
+      line-height: 1.4;
+      color: #78350f;
+      margin-bottom: 12px;
+    }
+
+    /* Segmented Meal Tabs */
+    .meal-tabs {
+      display: flex;
+      background: var(--slate-100);
+      padding: 3px;
+      border-radius: 11px;
+      margin-bottom: 12px;
+      gap: 4px;
+    }
+
+    .meal-tab-btn {
+      flex: 1;
+      border: none;
+      background: transparent;
+      padding: 8px 10px;
+      border-radius: 8px;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--slate-600);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.15s;
+    }
+
+    .meal-tab-btn.active {
+      background: #fff;
+      color: var(--burgundy);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+    }
+
+    .meal-tab-btn.disabled {
+      opacity: 0.45;
+      cursor: default;
+    }
+
+    /* Course Breakdown Cards */
+    .meal-section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+
+    .meal-badge-title {
+      font-size: 12px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--burgundy);
+    }
+
+    .course-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .course-box {
+      background: var(--slate-50);
+      border: 1px solid var(--slate-200);
+      border-radius: 12px;
+      padding: 10px 12px;
+    }
+
+    .course-label {
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--slate-600);
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .dish-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+    }
+
+    .dish-chip {
+      background: #fff;
+      border: 1px solid var(--slate-200);
+      border-radius: 8px;
+      padding: 4px 9px;
+      font-size: 12.5px;
+      font-weight: 500;
+      color: var(--slate-800);
+      line-height: 1.3;
+    }
+
+    .dish-chip.highlight {
+      background: #fef08a;
+      border-color: #eab308;
+      font-weight: 700;
+    }
+
+    .na-box {
+      padding: 14px;
+      background: var(--slate-50);
+      border: 1px dashed var(--slate-200);
+      border-radius: 12px;
+      text-align: center;
+      color: var(--slate-500);
+      font-size: 13px;
+      font-weight: 500;
+      margin-bottom: 12px;
+    }
+
+    .meta-address {
+      font-size: 12px;
+      color: var(--slate-500);
+      margin-top: 4px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    /* Sticky Action Footer inside Sheet */
+    .sheet-footer {
+      padding: 10px 16px calc(var(--safe-bottom) + 12px) 16px;
+      border-top: 1px solid var(--slate-200);
+      background: #fff;
+      display: grid;
+      grid-template-columns: 1.5fr 1fr 1fr 0.8fr;
+      gap: 7px;
+      flex-shrink: 0;
+    }
+
+    .act-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      padding: 10px 8px;
+      border-radius: 11px;
+      font-size: 12.5px;
+      font-weight: 700;
+      text-decoration: none;
+      text-align: center;
+      border: 1px solid var(--slate-200);
+      background: var(--slate-50);
+      color: var(--slate-800);
+      white-space: nowrap;
+    }
+    .act-btn:active {
+      transform: scale(0.98);
+    }
+
+    .act-btn-primary {
+      background: var(--burgundy);
+      color: #fff;
+      border-color: var(--burgundy);
+      box-shadow: 0 3px 10px rgba(139, 13, 39, 0.25);
+    }
+
+    /* Browse List Mode */
+    .list-header-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+
+    .sort-select {
+      border: 1px solid var(--slate-200);
+      border-radius: 8px;
+      padding: 5px 8px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--slate-700);
+      background: var(--slate-50);
+    }
+
+    .rest-list-item {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      padding: 11px;
+      border: 1px solid var(--slate-200);
+      border-radius: 14px;
+      margin-bottom: 8px;
+      background: #fff;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .rest-list-item:active {
+      background: var(--slate-50);
+      border-color: var(--burgundy);
+    }
+
+    .list-item-thumb {
+      width: 54px;
+      height: 54px;
+      border-radius: 10px;
+      object-fit: cover;
+      flex-shrink: 0;
+      background: var(--slate-100);
+    }
+
+    .list-item-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .list-item-title {
+      font-size: 14.5px;
+      font-weight: 700;
+      color: var(--slate-900);
+      margin: 0 0 3px 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .list-item-sub {
+      font-size: 11.5px;
+      color: var(--slate-500);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-bottom: 4px;
+    }
+
+    .price-tag {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 5px;
+      background: var(--burgundy-light);
+      color: var(--burgundy);
+    }
+
+    .price-tag-lunch {
+      background: var(--emerald-light);
+      color: var(--emerald);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Interactive Map -->
+  <div id="map"></div>
+
+  <!-- Floating Top Controls -->
+  <div class="top-overlay">
+    <div class="search-card">
+      <div class="brand-row">
+        <div class="brand-title">
+          <span>🍷 Main Line Restaurant Week</span>
+        </div>
+        <div class="brand-actions">
+          <button class="mini-btn" id="fitBoundsBtn" title="Reset Map View">🗺️ Fit All</button>
+          <a class="mini-btn" href="https://docs.google.com/spreadsheets/d/1OaHxcAuXfgY_mpGiXIglDMQmfctaXCY1xmOZlDBM_Ls/edit?gid=0#gid=0" target="_blank" rel="noopener">📊 Sheet</a>
+        </div>
+      </div>
+      <div class="search-input-wrap">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="searchInput" placeholder="Search dish (&quot;short rib&quot;, &quot;salmon&quot;), name..." autocomplete="off" />
+        <button id="clearSearchBtn" aria-label="Clear search">×</button>
+        <select id="townSelect" aria-label="Filter by town">
+          <option value="ALL">All Towns</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="pills-scroll" id="filterPills">
+      <button class="filter-pill active" data-filter="ALL">All (41)</button>
+      <button class="filter-pill" data-filter="TOP">⭐ 4.6+ Rated</button>
+      <button class="filter-pill" data-filter="LUNCH">☀️ Has Lunch</button>
+      <button class="filter-pill" data-filter="DINNER_45">💵 Dinner ≤ $45</button>
+      <button class="filter-pill" data-filter="DINNER_55">🍷 Dinner $55+</button>
+      <button class="filter-pill" data-filter="WAYNE_RADNOR">📍 Wayne / Radnor</button>
+      <button class="filter-pill" data-filter="BYOB">🍾 BYOB</button>
+    </div>
+  </div>
+
+  <!-- Floating Bottom Pill -->
+  <div class="bottom-bar-float" id="bottomFloat">
+    <button class="list-toggle-btn" id="openListBtn">
+      <span>📋 View List</span>
+      <span id="countBadge" style="background:rgba(255,255,255,0.2);padding:2px 7px;border-radius:999px;font-size:11px;">41</span>
+    </button>
+    <div class="legend-pill">
+      <span><i class="dot" style="background:#047857"></i> ≤$38</span>
+      <span><i class="dot" style="background:#c2410c"></i> $45</span>
+      <span><i class="dot" style="background:#8b0d27"></i> $55+</span>
+    </div>
+  </div>
+
+  <!-- Slide-up Bottom Sheet -->
+  <div class="bottom-sheet" id="bottomSheet">
+    <div class="sheet-top-bar" id="sheetHeaderBar">
+      <div class="nav-arrows" id="detailNavArrows">
+        <button class="icon-circle-btn" id="prevRestBtn" title="Previous restaurant">‹</button>
+        <button class="icon-circle-btn" id="nextRestBtn" title="Next restaurant">›</button>
+      </div>
+      <div class="drag-handle-wrap" id="closeSheetHandle">
+        <div class="drag-pill"></div>
+      </div>
+      <button class="icon-circle-btn" id="closeSheetBtn" title="Close">✕</button>
+    </div>
+
+    <div class="sheet-scroll-body" id="sheetBody"></div>
+    <div class="sheet-footer" id="sheetFooter" style="display:none;"></div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script>
+    const RESTAURANTS = [{"id":1,"name":"Limoncello, Chester Springs","town":"Chester Springs","lunchPrice":"N/A","lPriceNum":0,"lunch":{"available":false,"raw":"N/A (Dinner only)","courses":[]},"dinnerPrice":"$55","dPriceNum":55,"dinner":{"available":true,"header":"3 Courses ($55)","raw":"3 Courses ($55):\n• Apps: Arancini, Meatball Eggrolls, Calamari & Shrimp Siciliani, Escarole Soup, Mussels Amatriciana, Beet Salad, Crispy Brussels\n• Mains: Chicken Limoncello, Braised Short Rib, Lobster Tagliatelle (+5), Gnocchi al Pesto, Veal Saltimbocca (+5), Stuffed Flounder, Salmon Limoncello, Pear Sacchetti\n• Dessert: Limoncello Cake, Cannoli, Tiramisu, Gelato/Sorbet","courses":[{"label":"Apps","items":["Arancini","Meatball Eggrolls","Calamari & Shrimp Siciliani","Escarole Soup","Mussels Amatriciana","Beet Salad","Crispy Brussels"],"text":"Arancini, Meatball Eggrolls, Calamari & Shrimp Siciliani, Escarole Soup, Mussels Amatriciana, Beet Salad, Crispy Brussels"},{"label":"Mains","items":["Chicken Limoncello","Braised Short Rib","Lobster Tagliatelle (+5)","Gnocchi al Pesto","Veal Saltimbocca (+5)","Stuffed Flounder","Salmon Limoncello","Pear Sacchetti"],"text":"Chicken Limoncello, Braised Short Rib, Lobster Tagliatelle (+5), Gnocchi al Pesto, Veal Saltimbocca (+5), Stuffed Flounder, Salmon Limoncello, Pear Sacchetti"},{"label":"Dessert","items":["Limoncello Cake","Cannoli","Tiramisu","Gelato/Sorbet"],"text":"Limoncello Cake, Cannoli, Tiramisu, Gelato/Sorbet"}]},"rating":4.6,"reviews":260,"cuisine":"Italian","address":"499 Uwchlan Ave, Chester Springs, PA 19425","phone":"(610) 524-3112","menuLink":"https://assets-mainlinetoday-com.s3-accelerate.amazonaws.com/2026/10/Limoncello-MLTRW-Menu.pdf","website":"https://limoncellorestaurant.com","notes":"3-course prix-fixe dinner ($55)","lat":40.06654,"lng":-75.64748,"photo":"https://assets.mainlinetoday.com/2024/01/mlt-cover.jpg","mltPage":"https://mainlinetoday.com/restaurant/limoncello-chester-springs/"},{"id":2,"name":"Cecilia","town":"Bridgeport","lunchPrice":"$30","lPriceNum":30,"lunch":{"available":false,"raw":"Not listed on flyer ($30 tier)","courses":[]},"dinnerPrice":"$55","dPriceNum":55,"dinner":{"available":true,"header":"3 Courses ($55)","raw":"3 Courses ($55):\n• Apps: Crispy Fried Artichokes, Tuna Tataki, House Pierogies, Santa Fe Salad\n• Mains: 12oz Prime Pork Chop, Korean BBQ Ahi Tuna w/ Fried Rice, Spicy Vodka Chicken Penne, Meat & Potato, Eggplant Stack\n• Dessert: Cannoli Trio Dip, Sticky Situation","courses":[{"label":"Apps","items":["Crispy Fried Artichokes","Tuna Tataki","House Pierogies","Santa Fe Salad"],"text":"Crispy Fried Artichokes, Tuna Tataki, House Pierogies, Santa Fe Salad"},{"label":"Mains","items":["12oz Prime Pork Chop","Korean BBQ Ahi Tuna w/ Fried Rice","Spicy Vodka Chicken Penne","Meat & Potato","Eggplant Stack"],"text":"12oz Prime Pork Chop, Korean BBQ Ahi Tuna w/ Fried Rice, Spicy Vodka Chicken Penne, Meat & Potato, Eggplant Stack"},{"label":"Dessert","items":["Cannoli Trio Dip","Sticky Situation"],"text":"Cannoli Trio Dip, Sticky Situation"}]},"rating":4.7,"reviews":55,"cuisine":"Italian / Modern American","address":"266 E 4th St, Bridgeport, PA 19405","phone":"(610) 272-1770","menuLink":"https://assets-mainlinetoday-com.s3-accelerate.amazonaws.com/2026/10/Cecilia-Restaurant-Week-2026-Lunch-Dinner-Menu.pdf","website":"https://ceciliabridgeport.com","notes":"New upscale hotspot in former Taphouse 23 space; standout 4.7 rating","lat":40.10333,"lng":-75.33058,"photo":"https://assets.mainlinetoday.com/2026/10/Cecilia-Image-2-300w.jpg","mltPage":"https://mainlinetoday.com/restaurant/cecilia/"},{"id":3,"name":"NAPA Kitchen and Wine","town":"Newtown Square","lunchPrice":"$30","lPriceNum":30,"lunch":{"available":true,"header":"3 Courses ($30)","raw":"3 Courses ($30):\n• Apps: She-Crab Soup, House Salad, Caesar Salad\n• Mains: Wagyu Double Smash Burger, Short Rib Pizza, Dynamite Salmon, Tuna Poke Bowl, Miyagi Roll\n• Dessert: Glazed Donut Bread Pudding, Pumpkin Spice Cheesecake, Gelato/Sorbet","courses":[{"label":"Apps","items":["She-Crab Soup","House Salad","Caesar Salad"],"text":"She-Crab Soup, House Salad, Caesar Salad"},{"label":"Mains","items":["Wagyu Double Smash Burger","Short Rib Pizza","Dynamite Salmon","Tuna Poke Bowl","Miyagi Roll"],"text":"Wagyu Double Smash Burger, Short Rib Pizza, Dynamite Salmon, Tuna Poke Bowl, Miyagi Roll"},{"label":"Dessert","items":["Glazed Donut Bread Pudding","Pumpkin Spice Cheesecake","Gelato/Sorbet"],"text":"Glazed Donut Bread Pudding, Pumpkin Spice Cheesecake, Gelato/Sorbet"}]},"dinnerPrice":"$45","dPriceNum":45,"dinner":{"available":true,"header":"3 Courses ($45)","raw":"3 Courses ($45):\n• Apps: Pork Belly Burnt Ends, Fried Goat Cheese w/ Figs, Miyagi Roll, Asian Lettuce Wraps, She-Crab Soup\n• Mains: Bulgogi Flat Iron Steak, Short Rib Gnocchi, Chicken Piccata, Hibachi Steak Fried Rice, Dynamite Salmon\n• Dessert: Glazed Donut Bread Pudding, Pumpkin Spice Cheesecake, Gelato/Sorbet","courses":[{"label":"Apps","items":["Pork Belly Burnt Ends","Fried Goat Cheese w/ Figs","Miyagi Roll","Asian Lettuce Wraps","She-Crab Soup"],"text":"Pork Belly Burnt Ends, Fried Goat Cheese w/ Figs, Miyagi Roll, Asian Lettuce Wraps, She-Crab Soup"},{"label":"Mains","items":["Bulgogi Flat Iron Steak","Short Rib Gnocchi","Chicken Piccata","Hibachi Steak Fried Rice","Dynamite Salmon"],"text":"Bulgogi Flat Iron Steak, Short Rib Gnocchi, Chicken Piccata, Hibachi Steak Fried Rice, Dynamite Salmon"},{"label":"Dessert","items":["Glazed Donut Bread Pudding","Pumpkin Spice Cheesecake","Gelato/Sorbet"],"text":"Glazed Donut Bread Pudding, Pumpkin Spice Cheesecake, Gelato/Sorbet"}]},"rating":4.5,"reviews":45,"cuisine":"American / Wine Bar","address":"3747 Equus Blvd, Newtown Square, PA 19073","phone":"(610) 356-6272","menuLink":"https://assets-mainlinetoday-com.s3-accelerate.amazonaws.com/2026/09/NAPA-Lunch-and-Dinner-Menu.pdf","website":"https://napakitchenandwine.com","notes":"Ellis Preserve; California wine country inspired cuisine","lat":39.98885,"lng":-75.40932,"photo":"https://assets.mainlinetoday.com/2026/11/NAPA-Smash-Burger-Horizontal-scaled.jpg","mltPage":"https://mainlinetoday.com/restaurant/napa-kitchen-and-wine/"},{"id":4,"name":"Merrick's Tavern","town":"Radnor","lunchPrice":"N/A","lPriceNum":0,"lunch":{"available":false,"raw":"N/A (Dinner only)","courses":[]},"dinnerPrice":"$55","dPriceNum":55,"dinner":{"available":true,"header":"3 Courses ($55)","raw":"3 Courses ($55):\n• Apps: French Onion Soup (gruyère, sherry), Caesar Salad, Burrata (fig jam, prosciutto, crostini)\n• Mains: Hanger Steak Frites (truffle fries, chimichurri), Pan Seared Salmon (risotto, asparagus), Rigatoni Bolognese (whipped ricotta)\n• Dessert: Brown Butter Panna Cotta, Warm Apple Pie w/ Mascarpone Whipped Cream","courses":[{"label":"Apps","items":["French Onion Soup (gruyère","sherry)","Caesar Salad","Burrata (fig jam","prosciutto","crostini)"],"text":"French Onion Soup (gruyère, sherry), Caesar Salad, Burrata (fig jam, prosciutto, crostini)"},{"label":"Mains","items":["Hanger Steak Frites (truffle fries","chimichurri)","Pan Seared Salmon (risotto","asparagus)","Rigatoni Bolognese (whipped ricotta)"],"text":"Hanger Steak Frites (truffle fries, chimichurri), Pan Seared Salmon (risotto, asparagus), Rigatoni Bolognese (whipped ricotta)"},{"label":"Dessert","items":["Brown Butter Panna Cotta","Warm Apple Pie w/ Mascarpone Whipped Cream"],"text":"Brown Butter Panna Cotta, Warm Apple Pie w/ Mascarpone Whipped Cream"}]},"rating":4.5,"reviews":60,"cuisine":"American / Tavern","address":"165 King of Prussia Rd, Radnor, PA 19087","phone":"(610) 688-5800","menuLink":"https://assets-mainlinetoday-com.s3-accelerate.amazonaws.com/2026/09/Merricks-Tavern-2026-MLTRW-Menu.pdf","website":"https://thebrandywinehotel.com/dining","notes":"Modern tavern inside The Brandywine hotel; French Onion soup, steaks, panna cotta","lat":40.04491,"lng":-75.36016,"photo":"https://assets.mainlinetoday.com/2026/10/Merricks-photo-4.jpg","mltPage":"https://mainlinetoday.com/restaurant/merricks-tavern/"},{"id":5,"name":"Triple Crown","town":"St. Davids","lunchPrice":"$35","lPriceNum":35,"lunch":{"available":true,"header":"3 Courses ($35)","raw":"3 Courses ($35):\n• Apps: Colossal Tiger Shrimp Cocktail, Lobster Bisque, Baby Wedge Salad (bacon lardons, blue cheese)\n• Mains: Prime Flat Iron Frites (garlic herb butter, shoestring fries), Crab Cake Sandwich (remoulade, brioche), Mediterranean Grain Bowl\n• Dessert: Warm Apple Crisp à la Mode, Chocolate Ganache Tart","courses":[{"label":"Apps","items":["Colossal Tiger Shrimp Cocktail","Lobster Bisque","Baby Wedge Salad (bacon lardons","blue cheese)"],"text":"Colossal Tiger Shrimp Cocktail, Lobster Bisque, Baby Wedge Salad (bacon lardons, blue cheese)"},{"label":"Mains","items":["Prime Flat Iron Frites (garlic herb butter","shoestring fries)","Crab Cake Sandwich (remoulade","brioche)","Mediterranean Grain Bowl"],"text":"Prime Flat Iron Frites (garlic herb butter, shoestring fries), Crab Cake Sandwich (remoulade, brioche), Mediterranean Grain Bowl"},{"label":"Dessert","items":["Warm Apple Crisp à la Mode","Chocolate Ganache Tart"],"text":"Warm Apple Crisp à la Mode, Chocolate Ganache Tart"}]},"dinnerPrice":"N/A","dPriceNum":0,"dinner":{"available":false,"raw":"N/A (Lunch only)","courses":[]},"rating":4.6,"reviews":155,"cuisine":"American / Casual Fine Dining","address":"593 E Lancaster Ave, St. Davids, PA 19087","phone":"(610) 688-5100","menuLink":"https://assets-mainlinetoday-com.s3-accelerate.amazonaws.com/2026/08/TripleCrown_MLRW2026.pdf","website":"https://triplecrownradnor.com","notes":"Located at The Radnor Hotel; 3-course lunch ($35)","lat":40.04138,"lng":-75.3691,"photo":"https://assets.mainlinetoday.com/2024/01/mlt-cover.jpg","mltPage":"https://mainlinetoday.com/restaurant/triple-crown/"},{"id":6,"name":"Southern Cross Kitchen","town":"Conshohocken","lunchPrice":"N/A","lPriceNum":0,"lunch":{"available":false,"raw":"N/A (Dinner only)","courses":[]},"dinnerPrice":"$60","dPriceNum":60,"dinner":{"available":true,"header":"3 Courses ($60)","raw":"3 Courses ($60):\n• Apps: Fried Green Tomatoes (pimento cheese, remoulade), Nashville Hot Cauliflower, Catfish Bites, Southern Wedge\n• Mains: Southern Fried Chicken (mac & cheese, collards, biscuit), Braised Beef Short Rib (cheesy grits), Blackened Salmon Jambalaya, Shrimp & Grits\n• Dessert: Warm Peach Bread Pudding, Key Lime Pie, Chocolate Pecan Pie","courses":[{"label":"Apps","items":["Fried Green Tomatoes (pimento cheese","remoulade)","Nashville Hot Cauliflower","Catfish Bites","Southern Wedge"],"text":"Fried Green Tomatoes (pimento cheese, remoulade), Nashville Hot Cauliflower, Catfish Bites, Southern Wedge"},{"label":"Mains","items":["Southern Fried Chicken (mac & cheese","collards","biscuit)","Braised Beef Short Rib (cheesy grits)","Blackened Salmon Jambalaya","Shrimp & Grits"],"text":"Southern Fried Chicken (mac & cheese, collards, biscuit), Braised Beef Short Rib (cheesy grits), Blackened Salmon Jambalaya, Shrimp & Grits"},{"label":"Dessert","items":["Warm Peach Bread Pudding","Key Lime Pie","Chocolate Pecan Pie"],"text":"Warm Peach Bread Pudding, Key Lime Pie, Chocolate Pecan Pie"}]},"rating":4.4,"reviews":1220,"cuisine":"Southern / Comfort Food","address":"8 E 1st Ave, Conshohocken, PA 19428","phone":"(484) 344-5668","menuLink":"https://assets-mainlinetoday-com.s3-accelerate.amazonaws.com/2026/08/SCK-Restaurant-Week-Menu-2026.pdf","website":"https://southerncrosskitchen.com","notes":"Upscale Southern comfort cooking in downtown Conshy; high review volume","lat":40.07388,"lng":-75.30608,"photo":"https://assets.mainlinetoday.com/2024/01/mlt-cover.jpg","mltPage":"https://mainlinetoday.com/restaurant/southern-cross-kitchen/"},{"id":7,"name":"Matines Café","town":"Wayne","lunchPrice":"$25","lPriceNum":25,"lunch":{"available":true,"header":"3 Courses ($25)","raw":"3 Courses ($25):\n• Apps: French Onion Soup (emmental crouton), Fall Salad (roasted beets, goat cheese, candied walnuts), Quiche du Jour\n• Mains: Croque Monsieur/Madame (béchamel, frites), Savory Crêpe (ham, gruyère, egg), Ratatouille Tartine, Parisian Chicken Sandwich\n• Dessert: Nutella Banana Crêpe, Profiteroles, Macaron Trio","courses":[{"label":"Apps","items":["French Onion Soup (emmental crouton)","Fall Salad (roasted beets","goat cheese","candied walnuts)","Quiche du Jour"],"text":"French Onion Soup (emmental crouton), Fall Salad (roasted beets, goat cheese, candied walnuts), Quiche du Jour"},{"label":"Mains","items":["Croque Monsieur/Madame (béchamel","frites)","Savory Crêpe (ham","gruyère","egg)","Ratatouille Tartine","Parisian Chicken Sandwich"],"text":"Croque Monsieur/Madame (béchamel, frites), Savory Crêpe (ham, gruyère, egg), Ratatouille Tartine, Parisian Chicken Sandwich"},{"label":"Dessert","items":["Nutella Banana Crêpe","Profiteroles","Macaron Trio"],"text":"Nutella Banana Crêpe, Profiteroles, Macaron Trio"}]},"dinnerPrice":"N/A","dPriceNum":0,"dinner":{"available":false,"raw":"N/A (Lunch only)","courses":[]},"rating":4.4,"reviews":140,"cuisine":"French Café / Bistro","address":"757 W Lancaster Ave, Wayne, PA 19087","phone":"(610) 902-0404","menuLink":"https://assets-mainlinetoday-com.s3-accelerate.amazonaws.com/2026/08/Matines-Cafe-MLT-Restaurant-Week-Lunch-Menu-2026.pdf","website":"https://matinescafe.com","notes":"Best budget lunch value at $25; charming French bistro ambiance","lat":40.04753,"lng":-75.40981,"photo":"https://assets.mainlinetoday.com/2026/09/MatinesCafe_Hero2.jpg","mltPage":"https://mainlinetoday.com/restaurant/matines-cafe/"},{"id":8,"name":"Maris Mediterranean","town":"Media","lunchPrice":"N/A","lPriceNum":0,"lunch":{"available":false,"raw":"N/A (Dinner only)","courses":[]},"dinnerPrice":"$55","dPriceNum":55,"dinner":{"available":true,"header":"3 Courses ($55)","raw":"3 Courses ($55):\n• Apps: Maris Chips (crispy zucchini & eggplant, tzatziki), Spanakopita, Charcoal Grilled Octopus (+5), Greek Horiatiki Salad\n• Mains: Whole Mediterranean Bronzino, Grilled Lamb Chops (lemon potatoes), Seafood Youvetsi (shrimp, calamari, orzo), Lemon Herb Chicken\n• Dessert: Homemade Baklava, Loukoumades (Greek honey puffs), Galaktoboureko","courses":[{"label":"Apps","items":["Maris Chips (crispy zucchini & eggplant","tzatziki)","Spanakopita","Charcoal Grilled Octopus (+5)","Greek Horiatiki Salad"],"text":"Maris Chips (crispy zucchini & eggplant, tzatziki), Spanakopita, Charcoal Grilled Octopus (+5), Greek Horiatiki Salad"},{"label":"Mains","items":["Whole Mediterranean Bronzino","Grilled Lamb Chops (lemon potatoes)","Seafood Youvetsi (shrimp","calamari","orzo)","Lemon Herb Chicken"],"text":"Whole Mediterranean Bronzino, Grilled Lamb Chops (lemon potatoes), Seafood Youvetsi (shrimp, calamari, orzo), Lemon Herb Chicken"},{"label":"Dessert","items":["Homemade Baklava","Loukoumades (Greek honey puffs)","Galaktoboureko"],"text":"Homemade Baklava, Loukoumades (Greek honey puffs), Galaktoboureko"}]},"rating":4.5,"reviews":85,"cuisine":"Mediterranean / Seafood","address":"214 W State St, Media, PA 19063","phone":"(610) 565-1044","menuLink":"https://assets-mainlinetoday-com.s3-accelerate.amazonaws.com/2026/08/MarisOption3.pdf","website":"https://marisseafood.com","notes":"Fresh coastal seafood on downtown Media's dining strip","lat":39.91828,"lng":-75.39226,"photo":"https://assets.mainlinetoday.com/2024/01/mlt-cover.jpg","mltPage":"https://mainlinetoday.com/restaurant/maris-mediterranean/"},{"id":9,"name":"Fond","town":"Wallingford","lunchPrice":"N/A","lPriceNum":0,"lunch":{"available":false,"raw":"N/A (Dinner only)","courses":[]},"dinnerPrice":"$55","dPriceNum":55,"dinner":{"available":true,"header":"3 Courses ($55)","raw":"3 Courses ($55):\n• Apps: Vichyssoise (melted leeks, pancetta), Endive Salad (blue cheese, pecans, mustard vinaigrette), French Escargot (hazelnut butter, chartreuse)\n• Mains: Beef Burgundy (red wine braised beef, turnips, gremolata), Scottish Salmon (French lentils, endive, dijon cream), Mushroom Risotto (truffle, hazelnuts, arugula)\n• Dessert: Caramelized Cinnamon Crème Brûlée w/ Chocolate Shortbread","courses":[{"label":"Apps","items":["Vichyssoise (melted leeks","pancetta)","Endive Salad (blue cheese","pecans","mustard vinaigrette)","French Escargot (hazelnut butter","chartreuse)"],"text":"Vichyssoise (melted leeks, pancetta), Endive Salad (blue cheese, pecans, mustard vinaigrette), French Escargot (hazelnut butter, chartreuse)"},{"label":"Mains","items":["Beef Burgundy (red wine braised beef","turnips","gremolata)","Scottish Salmon (French lentils","endive","dijon cream)","Mushroom Risotto (truffle","hazelnuts","arugula)"],"text":"Beef Burgundy (red wine braised beef, turnips, gremolata), Scottish Salmon (French lentils, endive, dijon cream), Mushroom Risotto (truffle, hazelnuts, arugula)"},{"label":"Dessert","items":["Caramelized Cinnamon Crème Brûlée w/ Chocolate Shortbread"],"text":"Caramelized Cinnamon Crème Brûlée w/ Chocolate Shortbread"}]},"rating":4.6,"reviews":70,"cuisine":"French Contemporary / New American","address":"21 N Providence Rd, Wallingford, PA 19086","phone":"(610) 566-2226","menuLink":"https://assets-mainlinetoday-com.s3-accelerate.amazonaws.com/2026/08/FOND-BYOB-MLTRW-Menu.pdf","website":"https://fondphilly.com","notes":"Chef Lee Styer's acclaimed former East Passyunk culinary jewel relocated to Delco","lat":39.9037,"lng":-75.3749,"photo":"https://assets.mainlinetoday.com/2026/10/FondBYOB_Nov2024_GBonghi-013.jpg","mltPage":"https://mainlinetoday.com/restaurant/fond/"},{"id":10,"name":"Brandywine Prime","town":"Chadds Ford","lunchPrice":"N/A","lPriceNum":0,"lunch":{"available":false,"raw":"N/A (Dinner only)","courses":[]},"dinnerPrice":"$55","dPriceNum":55,"dinner":{"available":true,"header":"3 Courses ($55)","raw":"3 Courses ($55):\n• Apps: Signature Grilled Romaine, Chopped Iceberg Wedge, Lobster Bisque, Maryland Crab Cake (+5)\n• Mains: 8oz Center Cut Prime Flat Iron Steak (garlic mashed potatoes), Pan Seared Salmon (herb butter), Veal Chop Milanese, Braised Short Ribs\n• Dessert: Bourbon Crème Brûlée, Warm Brownie Pie, Signature Butter Cake","courses":[{"label":"Apps","items":["Signature Grilled Romaine","Chopped Iceberg Wedge","Lobster Bisque","Maryland Crab Cake (+5)"],"text":"Signature Grilled Romaine, Chopped Iceberg Wedge, Lobster Bisque, Maryland Crab Cake (+5)"},{"label":"Mains","items":["8oz Center Cut Prime Flat Iron Steak (garlic mashed potatoes)","Pan Seared Salmon (herb butter)","Veal Chop Milanese","Braised Short Ribs"],"text":"8oz Center Cut Prime Flat Iron Steak (garlic mashed potatoes), Pan Seared Salmon (herb butter), Veal Chop Milanese, Braised Short Ribs"},{"label":"Dessert","items":["Bourbon Crème Brûlée","Warm Brownie Pie","Signature Butter Cake"],"text":"Bourbon Crème Brûlée, Warm Brownie Pie, Signature Butter Cake"}]},"rating":4.5,"reviews":710,"cuisine":"Steakhouse / American","address":"1617 Baltimore Pike, Chadds Ford, PA 19317","phone":"(610) 388-8088","menuLink":"https://brandywineprime.com/","website":"https://brandywineprime.com","notes":"Historic 1700s Chadds Ford Inn; premier steakhouse & chops","lat":39.87235,"lng":-75.59085,"photo":"https://assets.mainlinetoday.com/2026/10/Brandywine-Prime-Photos.jpg","mltPage":"https://mainlinetoday.com/restaurant/brandywine-prime/"},{"id":11,"name":"Avlos Greek Cuisine","town":"Phoenixville","lunchPrice":"$35","lPriceNum":35,"lunch":{"available":true,"header":"3 Courses ($35)","raw":"3 Courses ($35):\n• Apps: Baked Feta (roasted red pepper, oregano, pita), Marouli Salata (shredded lettuce, dill, lemon dressing)\n• Mains: Chicken Souvlaki Skewer (lemon potatoes, tzatziki, onions)\n• Dessert: Baklava (layered phyllo, walnuts, sugar cane syrup)","courses":[{"label":"Apps","items":["Baked Feta (roasted red pepper","oregano","pita)","Marouli Salata (shredded lettuce","dill","lemon dressing)"],"text":"Baked Feta (roasted red pepper, oregano, pita), Marouli Salata (shredded lettuce, dill, lemon dressing)"},{"label":"Mains","items":["Chicken Souvlaki Skewer (lemon potatoes","tzatziki","onions)"],"text":"Chicken Souvlaki Skewer (lemon potatoes, tzatziki, onions)"},{"label":"Dessert","items":["Baklava (layered phyllo","walnuts","sugar cane syrup)"],"text":"Baklava (layered phyllo, walnuts, sugar cane syrup)"}]},"dinnerPrice":"$55","dPriceNum":55,"dinner":{"available":true,"header":"3 Courses ($55)","raw":"3 Courses ($55):\n• Apps: Shrimp Saganaki (baked shrimp, feta, olives, hot peppers, pita), Greek Salata (tomatoes, cucumbers, olives, oregano)\n• Mains: Pan Seared Salmon Fillet (couscous, spinach, lemon dill sauce)\n• Dessert: Traditional Greek Baklava","courses":[{"label":"Apps","items":["Shrimp Saganaki (baked shrimp","feta","olives","hot peppers","pita)","Greek Salata (tomatoes","cucumbers","olives","oregano)"],"text":"Shrimp Saganaki (baked shrimp, feta, olives, hot peppers, pita), Greek Salata (tomatoes, cucumbers, olives, oregano)"},{"label":"Mains","items":["Pan Seared Salmon Fillet (couscous","spinach","lemon dill sauce)"],"text":"Pan Seared Salmon Fillet (couscous, spinach, lemon dill sauce)"},{"label":"Dessert","items":["Traditional Greek Baklava"],"text":"Traditional Greek Baklava"}]},"rating":4.8,"reviews":210,"cuisine":"Greek / Mediterranean","address":"258 Bridge St, Phoenixville, PA 19460","phone":"(610) 455-4110","menuLink":"https://assets-mainlinetoday-com.s3-accelerate.amazonaws.com/2026/08/Avlos-MLTRW-Lunch-Dinner-Menu-2026.pdf","website":"https://avlosgr.com","notes":"Highest-rated restaurant on the list (4.8 stars); authentic Greek cuisine on Bridge St","lat":40.13371,"lng":-75.51778,"photo":"https://assets.mainlinetoday.com/2024/01/mlt-cover.jpg","mltPage":"https://mainlinetoday.com/restaurant/avlos-greek-cuisine/"},{"id":12,"name":"Terrain Cafe - Doylestown","town":"Doylestown","lunchPrice":"N/A","lPriceNum":0,"lunch":{"available":false,"raw":"N/A (Dinner only)","courses":[]},"dinnerPrice":"$45","dPriceNum":45,"dinner":{"available":true,"header":"3 Courses ($45)","raw":"3 Courses ($45):\n• Apps: Kennett Square Mushroom Soup, Harvest Squash Salad (pepitas, goat cheese), Cast Iron Skillet Cornbread (chili honey)\n• Mains: Seasonal Salmon (butternut purée, wild grains), Braised Short Rib Tagliatelle, Roasted Half Chicken (rosemary jus, root veg), Stuffed Acorn Squash\n• Dessert: Warm Apple Cider Cake (vanilla bean gelato), Flourless Dark Chocolate Torte","courses":[{"label":"Apps","items":["Kennett Square Mushroom Soup","Harvest Squash Salad (pepitas","goat cheese)","Cast Iron Skillet Cornbread (chili honey)"],"text":"Kennett Square Mushroom Soup, Harvest Squash Salad (pepitas, goat cheese), Cast Iron Skillet Cornbread (chili honey)"},{"label":"Mains","items":["Seasonal Salmon (butternut purée","wild grains)","Braised Short Rib Tagliatelle","Roasted Half Chicken (rosemary jus","root veg)","Stuffed Acorn Squash"],"text":"Seasonal Salmon (butternut purée, wild grains), Braised Short Rib Tagliatelle, Roasted Half Chicken (rosemary jus, root veg), Stuffed Acorn Squash"},{"label":"Dessert","items":["Warm Apple Cider Cake (vanilla bean gelato)","Flourless Dark Chocolate Torte"],"text":"Warm Apple Cider Cake (vanilla bean gelato), Flourless Dark Chocolate Torte"}]},"rating":4.5,"reviews":520,"cuisine":"American / Farm-to-Table","address":"2100 Lower State Rd, Doylestown, PA 18901","phone":"(267) 544-0100","menuLink":"https://assets-mainlinetoday-com.s3-accelerate.amazonaws.com/2025/09/TerrainCafe_MLTRestaurantWeek_Menus.pdf","website":"https://shopterrain.com/pages/doylestown-cafe","notes":"URBN greenhouse aesthetic; farm-to-table dining","lat":40.29224,"lng":-75.15118,"photo":"https://assets.mainlinetoday.com/2025/09/terrain-french-toast.jpg","mltPage":"https://mainlinetoday.com/restaurant/terrain-cafe-doylestown/"},{"id":13,"name":"Turks Head Wines","town":"West Chester","lunchPrice":"$35","lPriceNum":35,"lunch":{"available":true,"header":"3 Courses ($35)","raw":"3 Courses ($35):\n• Apps: Caesar Salad, Charcuterie Board (artisan cheeses, cured meats, crostini)\n• Mains: Artisanal Flatbread (prosciutto & fig or margherita), Wine Country Panini (turkey, brie, apple), Salmon Grain Bowl\n• Dessert: House Wine-Infused Chocolate Truffles, Berry Tart","courses":[{"label":"Apps","items":["Caesar Salad","Charcuterie Board (artisan cheeses","cured meats","crostini)"],"text":"Caesar Salad, Charcuterie Board (artisan cheeses, cured meats, crostini)"},{"label":"Mains","items":["Artisanal Flatbread (prosciutto & fig or margherita)","Wine Country Panini (turkey","brie","apple)","Salmon Grain Bowl"],"text":"Artisanal Flatbread (prosciutto & fig or margherita), Wine Country Panini (turkey, brie, apple), Salmon Grain Bowl"},{"label":"Dessert","items":["House Wine-Infused Chocolate Truffles","Berry Tart"],"text":"House Wine-Infused Chocolate Truffles, Berry Tart"}]},"dinnerPrice":"$55","dPriceNum":55,"dinner":{"available":true,"header":"3 Courses ($55)","raw":"3 Courses ($55):\n• Apps: Truffle Burrata, Artisanal Charcuterie & Cheese Pairing, Fall Harvest Salad\n• Mains: Braised Beef Short Rib (cabernet reduction), Seared Sea Scallops (parmesan risotto), Wild Mushroom Ravioli\n• Dessert: Dark Chocolate Cabernet Pots de Crème, Lemon Ricotta Cheesecake","courses":[{"label":"Apps","items":["Truffle Burrata","Artisanal Charcuterie & Cheese Pairing","Fall Harvest Salad"],"text":"Truffle Burrata, Artisanal Charcuterie & Cheese Pairing, Fall Harvest Salad"},{"label":"Mains","items":["Braised Beef Short Rib (cabernet reduction)","Seared Sea Scallops (parmesan risotto)","Wild Mushroom Ravioli"],"text":"Braised Beef Short Rib (cabernet reduction), Seared Sea Scallops (parmesan risotto), Wild Mushroom Ravioli"},{"label":"Dessert","items":["Dark Chocolate Cabernet Pots de Crème","Lemon Ricotta Cheesecake"],"text":"Dark Chocolate Cabernet Pots de Crème, Lemon Ricotta Cheesecake"}]},"rating":4.8,"reviews":120,"cuisine":"Wine Bar / Small Plates","address":"120 N Church St, West Chester, PA 19380","phone":"(484) 947-5110","menuLink":"https://assets-mainlinetoday-com.s3-accelerate.amazonaws.com/2025/09/Turks-Head-Lunch-Dinner-Menu.pdf","website":"https://turksheadwines.com","notes":"Tied highest-rated (4.8 stars); artisan winery & bistro experience","lat":39.96046,"lng":-75.60693,"photo":"https://assets.mainlinetoday.com/2026/09/Turks-Head-2.jpg","mltPage":"https://mainlinetoday.com/restaurant/turks-head-wines/"},{"id":14,"name":"White Dog Cafe Chester Springs","town":"Chester Springs","lunchPrice":"$30","lPriceNum":30,"lunch":{"available":true,"header":"3 Courses ($30)","raw":"3 Courses ($30):\n• Apps: Kennett Square Mushroom Soup (truffle crème fraîche), Autumn Squash Bisque, PA Cheddar & Potato Pierogies, Local Beet Salad\n• Mains: Green Meadow Farm Double Cheddar Burger (bacon jam, truffle frites), Spicy Lamb Bolognese, Fall Harvest Grain Bowl, Crispy Chicken Sandwich\n• Dessert: Warm Apple Bread Pudding, Pumpkin Cheesecake, Salted Caramel Ice Cream","courses":[{"label":"Apps","items":["Kennett Square Mushroom Soup (truffle crème fraîche)","Autumn Squash Bisque","PA Cheddar & Potato Pierogies","Local Beet Salad"],"text":"Kennett Square Mushroom Soup (truffle crème fraîche), Autumn Squash Bisque, PA Cheddar & Potato Pierogies, Local Beet Salad"},{"label":"Mains","items":["Green Meadow Farm Double Cheddar Burger (bacon jam","truffle frites)","Spicy Lamb Bolognese","Fall Harvest Grain Bowl","Crispy Chicken Sandwich"],"text":"Green Meadow Farm Double Cheddar Burger (bacon jam, truffle frites), Spicy Lamb Bolognese, Fall Harvest Grain Bowl, Crispy Chicken Sandwich"},{"label":"Dessert","items":["Warm Apple Bread Pudding","Pumpkin Cheesecake","Salted Caramel Ice Cream"],"text":"Warm Apple Bread Pudding, Pumpkin Cheesecake, Salted Caramel Ice Cream"}]},"dinnerPrice":"$45","dPriceNum":45,"dinner":{"available":true,"header":"3 Courses ($45)","raw":"3 Courses ($45):\n• Apps: Kennett Square Mushroom Soup (truffle crème fraîche), Autumn Squash Bisque, PA Noble Cheddar Pierogies, Roasted Beet & Goat Cheese\n• Mains: Lancaster Free-Range Roast Chicken (potatoes, herb jus), Spicy Lamb Bolognese (casarecce, ricotta), Loch Duart Salmon (wild rice, apple slaw), Braised Short Rib (+8)\n• Dessert: Warm Apple Bread Pudding (caramel gelato), Pumpkin Spiced Cheesecake, Flourless Chocolate Cake","courses":[{"label":"Apps","items":["Kennett Square Mushroom Soup (truffle crème fraîche)","Autumn Squash Bisque","PA Noble Cheddar Pierogies","Roasted Beet & Goat Cheese"],"text":"Kennett Square Mushroom Soup (truffle crème fraîche), Autumn Squash Bisque, PA Noble Cheddar Pierogies, Roasted Beet & Goat Cheese"},{"label":"Mains","items":["Lancaster Free-Range Roast Chicken (potatoes","herb jus)","Spicy Lamb Bolognese (casarecce","ricotta)","Loch Duart Salmon (wild rice","apple slaw)","Braised Short Rib (+8)"],"text":"Lancaster Free-Range Roast Chicken (potatoes, herb jus), Spicy Lamb Bolognese (casarecce, ricotta), Loch Duart Salmon (wild rice, apple slaw), Braised Short Rib (+8)"},{"label":"Dessert","items":["Warm Apple Bread Pudding (caramel gelato)","Pumpkin Spiced Cheesecake","Flourless Chocolate Cake"],"text":"Warm Apple Bread Pudding (caramel gelato), Pumpkin Spiced Cheesecake, Flourless Chocolate Cake"}]},"rating":4.3,"reviews":350,"cuisine":"American / Farm-to-Table","address":"181 Gordon Dr, Exton, PA 19341","phone":"(610) 827-9000","menuLink":"https://assets-mainlinetoday-com.s3-accelerate.amazonaws.com/2025/09/WDCS-MLRW_Lunch-Dinner-Menu-2026_New.pdf","website":"https://whitedog.com","notes":"Fearless Restaurant group's newest White Dog outpost in Chester County","lat":40.06018,"lng":-75.66692,"photo":"https://assets.mainlinetoday.com/2026/10/WDCS-Chicken-scaled.jpg","mltPage":"https://mainlinetoday.com/restaurant/white-dog-cafe-chester-springs/"},{"id":15,"name":"The Farmer's Daughter Bar & Restaurant","town":"Blue Bell","lunchPrice":"$25","lPriceNum":25,"lunch":{"available":true,"header":"3 Courses ($25)","raw":"3 Courses ($25):\n• Apps: Butternut Squash Soup, Farmer's Caesar Salad, Crispy Brussels Sprouts\n• Mains: Farmhouse Smash Burger, Grilled Chicken BLT (avocado, brioche), Margherita Flatbread, Autumn Chopped Salad\n• Dessert: Warm Apple Cobbler, Vanilla Bean Crème Brûlée","courses":[{"label":"Apps","items":["Butternut Squash Soup","Farmer's Caesar Salad","Crispy Brussels Sprouts"],"text":"Butternut Squash Soup, Farmer's Caesar Salad, Crispy Brussels Sprouts"},{"label":"Mains","items":["Farmhouse Smash Burger","Grilled Chicken BLT (avocado","brioche)","Margherita Flatbread","Autumn Chopped Salad"],"text":"Farmhouse Smash Burger, Grilled Chicken BLT (avocado, brioche), Margherita Flatbread, Autumn Chopped Salad"},{"label":"Dessert","items":["Warm Apple Cobbler","Vanilla Bean Crème Brûlée"],"text":"Warm Apple Cobbler, Vanilla Bean Crème Brûlée"}]},"dinnerPrice":"$55","dPriceNum":55,"dinner":{"available":true,"header":"3 Courses ($55)","raw":"3 Courses ($55):\n• Apps: Kennett Square Mushroom Tart, Jumbo Lump Crab Cake, Burrata & Prosciutto, Farmer's Salad\n• Mains: Prime Filet Mignon Medallions (garlic mash, demi), Pan Roasted Halibut, Braised Pork Shank (polenta), Butternut Squash Ravioli\n• Dessert: Flourless Chocolate Torte, Spiced Apple Cheesecake, Crème Brûlée","courses":[{"label":"Apps","items":["Kennett Square Mushroom Tart","Jumbo Lump Crab Cake","Burrata & Prosciutto","Farmer's Salad"],"text":"Kennett Square Mushroom Tart, Jumbo Lump Crab Cake, Burrata & Prosciutto, Farmer's Salad"},{"label":"Mains","items":["Prime Filet Mignon Medallions (garlic mash","demi)","Pan Roasted Halibut","Braised Pork Shank (polenta)","Butternut Squash Ravioli"],"text":"Prime Filet Mignon Medallions (garlic mash, demi), Pan Roasted Halibut, Braised Pork Shank (polenta), Butternut Squash Ravioli"},{"label":"Dessert","items":["Flourless Chocolate Torte","Spiced Apple Cheesecake","Crème Brûlée"],"text":"Flourless Chocolate Torte, Spiced Apple Cheesecake, Crème Brûlée"}]},"rating":4.4,"reviews":940,"cuisine":"American / Farm-to-Table","address":"1401 Morris Rd, Blue Bell, PA 19422","phone":"(215) 616-8300","menuLink":"https://assets-mainlinetoday-com.s3-accelerate.amazonaws.com/2025/09/The-Farmers-Daughter-Lunch-Dinner-menu.pdf","website":"https://normandyfarm.com/the-farmers-daughter","notes":"Normandy Farm destination; unbeatable $25 lunch tier","lat":40.17743,"lng":-75.27359,"photo":"https://assets.mainlinetoday.com/2024/01/mlt-cover.jpg","mltPage":"https://mainlinetoday.com/restaurant/the-farmers-daughter-bar-restaurant/"},{"id":16,"name":"Fork & Bottle at The Desmond","town":"Malvern","lunchPrice":"N/A","lPriceNum":0,"lunch":{"available":false,"raw":"N/A (Dinner only)","courses":[]},"dinnerPrice":"$45","dPriceNum":45,"dinner":{"available":true,"header":"3 Courses ($45)","raw":"3 Courses ($45):\n• Apps: Desmond Famous Bread Pudding Appetizer (savory leek & bacon), French Onion Soup, Roasted Beet & Arugula Salad\n• Mains: Slow Braised Beef Short Rib (mashed potatoes, roasted carrots), Pan Roasted Salmon (dijon glaze, orzo), Desmond Roast Half Chicken, Pumpkin Gnocchi\n• Dessert: Signature Desmond Bread Pudding (warm vanilla whiskey sauce), Triple Chocolate Mousse Cake","courses":[{"label":"Apps","items":["Desmond Famous Bread Pudding Appetizer (savory leek & bacon)","French Onion Soup","Roasted Beet & Arugula Salad"],"text":"Desmond Famous Bread Pudding Appetizer (savory leek & bacon), French Onion Soup, Roasted Beet & Arugula Salad"},{"label":"Mains","items":["Slow Braised Beef Short Rib (mashed potatoes","roasted carrots)","Pan Roasted Salmon (dijon glaze","orzo)","Desmond Roast Half Chicken","Pumpkin Gnocchi"],"text":"Slow Braised Beef Short Rib (mashed potatoes, roasted carrots), Pan Roasted Salmon (dijon glaze, orzo), Desmond Roast Half Chicken, Pumpkin Gnocchi"},{"label":"Dessert","items":["Signature Desmond Bread Pudding (warm vanilla whiskey sauce)","Triple Chocolate Mousse Cake"],"text":"Signature Desmond Bread Pudding (warm vanilla whiskey sauce), Triple Chocolate Mousse Cake"}]},"rating":4.4,"reviews":247,"cuisine":"American / Continental","address":"1 Liberty Blvd, Malvern, PA 19355","phone":"(610) 296-9800","menuLink":"https://assets-mainlinetoday-com.s3-accelerate.amazonaws.com/2025/09/Fork-and-Bottle-Dinner-Menu-2026.pdf","website":"https://desmondgv.com/dining","notes":"Upscale hotel dining; great $45 steak/seafood options","lat":40.05466,"lng":-75.5282,"photo":"https://assets.mainlinetoday.com/2025/10/Fork-Bottle-MLTRW-Photo-steak.jpg","mltPage":"https://mainlinetoday.com/restaurant/fork-bottle-at-the-desmond/"},{"id":17,"name":"Amada Radnor","town":"Wayne","lunchPrice":"N/A","lPriceNum":0,"lunch":{"available":false,"raw":"N/A (Dinner only)","courses":[]},"dinnerPrice":"$55","dPriceNum":55,"dinner":{"available":true,"header":"3 Courses ($55)","raw":"3 Courses ($55):\n• Apps / Tapas: Jamón Ibérico & Manchego Croquetas, Datiles con Almendras (bacon wrapped dates), Garlic Shrimp (Gambas al Ajillo), Ensalada Verde\n• Mains: Traditional Paella Valenciana (chicken, chorizo, seafood), Seared Hanger Steak (mojo verde, papas bravas), Grilled Branzino\n• Dessert: Churros con Chocolate, Pastel Vasco (traditional Basque cake)","courses":[{"label":"Apps / Tapas","items":["Jamón Ibérico & Manchego Croquetas","Datiles con Almendras (bacon wrapped dates)","Garlic Shrimp (Gambas al Ajillo)","Ensalada Verde"],"text":"Jamón Ibérico & Manchego Croquetas, Datiles con Almendras (bacon wrapped dates), Garlic Shrimp (Gambas al Ajillo), Ensalada Verde"},{"label":"Mains","items":["Traditional Paella Valenciana (chicken","chorizo","seafood)","Seared Hanger Steak (mojo verde","papas bravas)","Grilled Branzino"],"text":"Traditional Paella Valenciana (chicken, chorizo, seafood), Seared Hanger Steak (mojo verde, papas bravas), Grilled Branzino"},{"label":"Dessert","items":["Churros con Chocolate","Pastel Vasco (traditional Basque cake)"],"text":"Churros con Chocolate, Pastel Vasco (traditional Basque cake)"}]},"rating":4.4,"reviews":333,"cuisine":"Spanish / Tapas","address":"555 E Lancaster Ave, Wayne, PA 19087","phone":"(484) 429-2158","menuLink":"https://assets-mainlinetoday-com.s3-accelerate.amazonaws.com/2025/09/Amada-2026-Restaurant-Week_Menu.pdf","website":"https://amadarestaurant.com","notes":"Chef Jose Garces flagship Spanish tapas & wine bar; stunning ambiance","lat":40.04178,"lng":-75.36985,"photo":"https://assets.mainlinetoday.com/2025/10/Amada-Radnor-MLTRW-Photo-scaled.jpeg","mltPage":"https://mainlinetoday.com/restaurant/amada-radnor/"},{"id":18,"name":"Pietro's Italian","town":"Radnor","lunchPrice":"N/A","lPriceNum":0,"lunch":{"available":false,"raw":"N/A (Dinner only)","courses":[]},"dinnerPrice":"$30","dPriceNum":30,"dinner":{"available":true,"header":"3 Courses ($30)","raw":"3 Courses ($30):\n• Apps: Pasta Fagioli Soup, Caesar Salad, Meatballs (veal, pork, beef in marinara), Mista Salad\n• Mains: Sautéed Branzino Filet (couscous, arugula), Eggplant Parmesan (homemade spaghetti), Roasted Chicken Piccata (truffle fries), Short Rib Pappardelle\n• Dessert: Homemade Gelato (Vanilla or Chocolate), Mango Sorbet","courses":[{"label":"Apps","items":["Pasta Fagioli Soup","Caesar Salad","Meatballs (veal","pork","beef in marinara)","Mista Salad"],"text":"Pasta Fagioli Soup, Caesar Salad, Meatballs (veal, pork, beef in marinara), Mista Salad"},{"label":"Mains","items":["Sautéed Branzino Filet (couscous","arugula)","Eggplant Parmesan (homemade spaghetti)","Roasted Chicken Piccata (truffle fries)","Short Rib Pappardelle"],"text":"Sautéed Branzino Filet (couscous, arugula), Eggplant Parmesan (homemade spaghetti), Roasted Chicken Piccata (truffle fries), Short Rib Pappardelle"},{"label":"Dessert","items":["Homemade Gelato (Vanilla or Chocolate)","Mango Sorbet"],"text":"Homemade Gelato (Vanilla or Chocolate), Mango Sorbet"}]},"rating":4.5,"reviews":698,"cuisine":"Italian / Pizzeria","address":"236 N Radnor Chester Rd, Radnor, PA 19087","phone":"(484) 367-7070","menuLink":"https://pietrospizza.com/files/radnor-restaurant-week-2026.pdf","website":"https://pietrospizza.com","notes":"Best dinner value on the entire Main Line: 3-course dinner for only $30 (Branzino, Short Ribs)","lat":40.04139,"lng":-75.36273,"photo":"https://assets.mainlinetoday.com/2025/09/Pietros-RW-Photo.jpg","mltPage":"https://mainlinetoday.com/restaurant/pietros-italian/"},{"id":19,"name":"Streetlight Kitchen & Bar","town":"Drexel Hill","lunchPrice":"N/A","lPriceNum":0,"lunch":{"available":false,"raw":"N/A (Dinner only)","courses":[]},"dinnerPrice":"$38","dPriceNum":38,"dinner":{"available":true,"header":"3 Courses ($38)","raw":"3 Courses ($38):\n• Apps: Cheesesteak Eggrolls (sweet chili ketchup), Crispy Wings (buffalo or honey garlic), Streetlight Chopped Salad\n• Mains: Blackened Salmon (cajun cream sauce, dirty rice), Streetlight Smash Burger (bacon jam, waffle fries), Cavatappi Vodka Pasta, Beer Battered Fish & Chips\n• Dessert: Warm Chocolate Chip Skillet Cookie, Funnel Cake Fries w/ Powdered Sugar","courses":[{"label":"Apps","items":["Cheesesteak Eggrolls (sweet chili ketchup)","Crispy Wings (buffalo or honey garlic)","Streetlight Chopped Salad"],"text":"Cheesesteak Eggrolls (sweet chili ketchup), Crispy Wings (buffalo or honey garlic), Streetlight Chopped Salad"},{"label":"Mains","items":["Blackened Salmon (cajun cream sauce","dirty rice)","Streetlight Smash Burger (bacon jam","waffle fries)","Cavatappi Vodka Pasta","Beer Battered Fish & Chips"],"text":"Blackened Salmon (cajun cream sauce, dirty rice), Streetlight Smash Burger (bacon jam, waffle fries), Cavatappi Vodka Pasta, Beer Battered Fish & Chips"},{"label":"Dessert","items":["Warm Chocolate Chip Skillet Cookie","Funnel Cake Fries w/ Powdered Sugar"],"text":"Warm Chocolate Chip Skillet Cookie, Funnel Cake Fries w/ Powdered Sugar"}]},"rating":4.6,"reviews":480,"cuisine":"American / Gastrobar","address":"5400 Ferne Blvd, Drexel Hill, PA 19026","phone":"(484) 461-9820","menuLink":"https://assets-mainlinetoday-com.s3-accelerate.amazonaws.com/2025/09/Streetlight-MLTRW-Menu.pdf","website":"https://streetlightkitchen.com","notes":"The Drexelbrook; standout $38 dinner price point with 4.6 rating","lat":39.9457,"lng":-75.31482,"photo":"https://assets.mainlinetoday.com/2024/01/mlt-cover.jpg","mltPage":"https://mainlinetoday.com/restaurant/streetlight-kitchen-bar/"},{"id":20,"name":"Agave Mexican Cuisine","town":"Chadds Ford","lunchPrice":"N/A","lPriceNum":0,"lunch":{"available":false,"raw":"N/A (Dinner only)","courses":[]},"dinnerPrice":"$45","dPriceNum":45,"dinner":{"available":true,"header":"3 Courses ($45)","raw":"3 Courses ($45):\n• Apps: House Guacamole, Mussels al Chipotle, Molotes de Plátano, Homemade Empanadas, Loaded Nachos (Chicken or Chorizo)\n• Mains: Short Rib Enchiladas, Pollo Poblano, Chile Relleno, Tacos de Pescado, Fresh Branzino, Sizzling Chicken Fajitas\n• Dessert: Spicy Chocolate Mousse Cake, Traditional Tres Leches, Warm Churros, Caramel Flan","courses":[{"label":"Apps","items":["House Guacamole","Mussels al Chipotle","Molotes de Plátano","Homemade Empanadas","Loaded Nachos (Chicken or Chorizo)"],"text":"House Guacamole, Mussels al Chipotle, Molotes de Plátano, Homemade Empanadas, Loaded Nachos (Chicken or Chorizo)"},{"label":"Mains","items":["Short Rib Enchiladas","Pollo Poblano","Chile Relleno","Tacos de Pescado","Fresh Branzino","Sizzling Chicken Fajitas"],"text":"Short Rib Enchiladas, Pollo Poblano, Chile Relleno, Tacos de Pescado, Fresh Branzino, Sizzling Chicken Fajitas"},{"label":"Dessert","items":["Spicy Chocolate Mousse Cake","Traditional Tres Leches","Warm Churros","Caramel Flan"],"text":"Spicy Chocolate Mousse Cake, Traditional Tres Leches, Warm Churros, Caramel Flan"}]},"rating":4.5,"reviews":631,"cuisine":"Mexican","address":"1620 Baltimore Pike, Chadds Ford, PA 19317","phone":"(484) 770-8345","menuLink":"https://assets-mainlinetoday-com.s3-accelerate.amazonaws.com/2025/09/Agave_3_Course_Dinner_Menu.pdf","website":"https://agavechaddsford.com","notes":"Upscale authentic Mexican cuisine; 3 courses for $45","lat":39.87185,"lng":-75.59025,"photo":"https://assets.mainlinetoday.com/2024/01/mlt-cover.jpg","mltPage":"https://mainlinetoday.com/restaurant/agave-mexican-cuisine/"},{"id":21,"name":"Gullifty's","town":"Rosemont","lunchPrice":"$30","lPriceNum":30,"lunch":{"available":true,"header":"3 Courses ($30)","raw":"3 Courses ($30):\n• Apps: Twice-Baked Loaded Potato Skins, Sweet Chili Brussels, Harvest Flatbread (apples, cranberries, pumpkin seeds)\n• Mains: Cheesesteak Mash Bowl, Pulled Pork Risotto, Hot Honey Chicken Quinoa Bowl\n• Dessert: Homemade Pumpkin Marshmallow Ice Cream, Pumpkin Cheesecake","courses":[{"label":"Apps","items":["Twice-Baked Loaded Potato Skins","Sweet Chili Brussels","Harvest Flatbread (apples","cranberries","pumpkin seeds)"],"text":"Twice-Baked Loaded Potato Skins, Sweet Chili Brussels, Harvest Flatbread (apples, cranberries, pumpkin seeds)"},{"label":"Mains","items":["Cheesesteak Mash Bowl","Pulled Pork Risotto","Hot Honey Chicken Quinoa Bowl"],"text":"Cheesesteak Mash Bowl, Pulled Pork Risotto, Hot Honey Chicken Quinoa Bowl"},{"label":"Dessert","items":["Homemade Pumpkin Marshmallow Ice Cream","Pumpkin Cheesecake"],"text":"Homemade Pumpkin Marshmallow Ice Cream, Pumpkin Cheesecake"}]},"dinnerPrice":"$30","dPriceNum":30,"dinner":{"available":true,"header":"3 Courses ($30)","raw":"3 Courses ($30):\n• Apps: Sweet Chili Brussels, Loaded Potato Skins, Harvest Flatbread\n• Mains: Cheesesteak Mash Bowl, Pulled Pork Parmesan Risotto, Hot Honey Chicken Quinoa Bowl\n• Dessert: Pumpkin Cheesecake, Dulce de Leche / Pumpkin Ice Cream","courses":[{"label":"Apps","items":["Sweet Chili Brussels","Loaded Potato Skins","Harvest Flatbread"],"text":"Sweet Chili Brussels, Loaded Potato Skins, Harvest Flatbread"},{"label":"Mains","items":["Cheesesteak Mash Bowl","Pulled Pork Parmesan Risotto","Hot Honey Chicken Quinoa Bowl"],"text":"Cheesesteak Mash Bowl, Pulled Pork Parmesan Risotto, Hot Honey Chicken Quinoa Bowl"},{"label":"Dessert","items":["Pumpkin Cheesecake","Dulce de Leche / Pumpkin Ice Cream"],"text":"Pumpkin Cheesecake, Dulce de Leche / Pumpkin Ice Cream"}]},"rating":4.4,"reviews":1250,"cuisine":"American / Craft Beer","address":"1149 Lancaster Ave, Rosemont, PA 19010","phone":"(610) 525-1851","menuLink":"https://assets-mainlinetoday-com.s3-accelerate.amazonaws.com/2025/09/Gulliftys-MLTRW-Menu-2026.pdf","website":"https://gulliftys.com","notes":"Main Line neighborhood classic since 1975; outstanding $30 dinner tier","lat":40.02504,"lng":-75.32527,"photo":"https://assets.mainlinetoday.com/2026/09/Gulliftys-Photo.png","mltPage":"https://mainlinetoday.com/restaurant/gulliftys-2/"},{"id":22,"name":"Pizzeria Vetri King of Prussia","town":"King of Prussia","lunchPrice":"$30","lPriceNum":30,"lunch":{"available":true,"header":"3 Courses ($30)","raw":"3 Courses ($30):\n• Apps: Wood-Fired Polpette (meatballs), Tuscan Kale Salad, Crispy Artichokes\n• Mains: Neapolitan Pizza Choice (Margherita, Pepperoni, Sausage & Fennel, or Seasonal Funghi), Baked Rigatoni\n• Dessert: Soft Serve Gelato (fior di latte or chocolate swirl), Mini Nutella Pizza","courses":[{"label":"Apps","items":["Wood-Fired Polpette (meatballs)","Tuscan Kale Salad","Crispy Artichokes"],"text":"Wood-Fired Polpette (meatballs), Tuscan Kale Salad, Crispy Artichokes"},{"label":"Mains","items":["Neapolitan Pizza Choice (Margherita","Pepperoni","Sausage & Fennel","or Seasonal Funghi)","Baked Rigatoni"],"text":"Neapolitan Pizza Choice (Margherita, Pepperoni, Sausage & Fennel, or Seasonal Funghi), Baked Rigatoni"},{"label":"Dessert","items":["Soft Serve Gelato (fior di latte or chocolate swirl)","Mini Nutella Pizza"],"text":"Soft Serve Gelato (fior di latte or chocolate swirl), Mini Nutella Pizza"}]},"dinnerPrice":"$45","dPriceNum":45,"dinner":{"available":true,"header":"3 Courses ($45)","raw":"3 Courses ($45):\n• Apps: Wood-Fired Polpette, Vetri Caesar Salad, Burrata w/ charred sourdough\n• Mains: Signature Neapolitan Pizzas (Margherita, Shuto, Carbonara, Maurizio), Wood-Oven Lasagna\n• Dessert: Nutella Pizza w/ marshmallow, Soft Serve Gelato sundae","courses":[{"label":"Apps","items":["Wood-Fired Polpette","Vetri Caesar Salad","Burrata w/ charred sourdough"],"text":"Wood-Fired Polpette, Vetri Caesar Salad, Burrata w/ charred sourdough"},{"label":"Mains","items":["Signature Neapolitan Pizzas (Margherita","Shuto","Carbonara","Maurizio)","Wood-Oven Lasagna"],"text":"Signature Neapolitan Pizzas (Margherita, Shuto, Carbonara, Maurizio), Wood-Oven Lasagna"},{"label":"Dessert","items":["Nutella Pizza w/ marshmallow","Soft Serve Gelato sundae"],"text":"Nutella Pizza w/ marshmallow, Soft Serve Gelato sundae"}]},"rating":4.1,"reviews":520,"cuisine":"Pizza / Italian","address":"150 Main St, King of Prussia, PA 19406","phone":"(267) 422-4201","menuLink":"https://assets-mainlinetoday-com.s3-accelerate.amazonaws.com/2025/09/PV_MLTRW_2026-Menu.pdf","website":"https://pizzeriavetri.com","notes":"Marc Vetri wood-fired authentic Neapolitan style pizza","lat":40.08386,"lng":-75.40459,"photo":"https://assets.mainlinetoday.com/2025/09/Pizzeria-Vetri-RW-photo.jpg","mltPage":"https://mainlinetoday.com/restaurant/pizzeria-vetri-king-of-prussia/"},{"id":23,"name":"Pizzeria Vetri Devon","town":"Devon","lunchPrice":"$30","lPriceNum":30,"lunch":{"available":true,"header":"3 Courses ($30)","raw":"3 Courses ($30):\n• Apps: Wood-Fired Polpette (meatballs), Tuscan Kale Salad, Crispy Artichokes\n• Mains: Neapolitan Pizza Choice (Margherita, Pepperoni, Sausage & Fennel, or Seasonal Funghi), Baked Rigatoni\n• Dessert: Soft Serve Gelato (fior di latte or chocolate swirl), Mini Nutella Pizza","courses":[{"label":"Apps","items":["Wood-Fired Polpette (meatballs)","Tuscan Kale Salad","Crispy Artichokes"],"text":"Wood-Fired Polpette (meatballs), Tuscan Kale Salad, Crispy Artichokes"},{"label":"Mains","items":["Neapolitan Pizza Choice (Margherita","Pepperoni","Sausage & Fennel","or Seasonal Funghi)","Baked Rigatoni"],"text":"Neapolitan Pizza Choice (Margherita, Pepperoni, Sausage & Fennel, or Seasonal Funghi), Baked Rigatoni"},{"label":"Dessert","items":["Soft Serve Gelato (fior di latte or chocolate swirl)","Mini Nutella Pizza"],"text":"Soft Serve Gelato (fior di latte or chocolate swirl), Mini Nutella Pizza"}]},"dinnerPrice":"$45","dPriceNum":45,"dinner":{"available":true,"header":"3 Courses ($45)","raw":"3 Courses ($45):\n• Apps: Wood-Fired Polpette, Vetri Caesar Salad, Burrata w/ charred sourdough\n• Mains: Signature Neapolitan Pizzas (Margherita, Shuto, Carbonara, Maurizio), Wood-Oven Lasagna\n• Dessert: Nutella Pizza w/ marshmallow, Soft Serve Gelato sundae","courses":[{"label":"Apps","items":["Wood-Fired Polpette","Vetri Caesar Salad","Burrata w/ charred sourdough"],"text":"Wood-Fired Polpette, Vetri Caesar Salad, Burrata w/ charred sourdough"},{"label":"Mains","items":["Signature Neapolitan Pizzas (Margherita","Shuto","Carbonara","Maurizio)","Wood-Oven Lasagna"],"text":"Signature Neapolitan Pizzas (Margherita, Shuto, Carbonara, Maurizio), Wood-Oven Lasagna"},{"label":"Dessert","items":["Nutella Pizza w/ marshmallow","Soft Serve Gelato sundae"],"text":"Nutella Pizza w/ marshmallow, Soft Serve Gelato sundae"}]},"rating":4.3,"reviews":410,"cuisine":"Pizza / Italian","address":"138 W Lancaster Ave, Devon, PA 19333","phone":"(267) 422-4201","menuLink":"https://assets-mainlinetoday-com.s3-accelerate.amazonaws.com/2025/09/PV_MLTRW_2026-Menu.pdf","website":"https://pizzeriavetri.com","notes":"Devon Yard setting; artisan pizza & Italian antipasti","lat":40.04632,"lng":-75.42268,"photo":"https://assets.mainlinetoday.com/2025/09/Pizzeria-Vetri-Devon-Rw-photo.jpg","mltPage":"https://mainlinetoday.com/restaurant/pizzeria-vetri-devon/"},{"id":24,"name":"Autograph Brasserie","town":"Wayne","lunchPrice":"$35","lPriceNum":35,"lunch":{"available":true,"header":"3 Courses ($35)","raw":"3 Courses ($35):\n• Apps: Truffle Pommes Frites, Caesar Salad, French Onion Soup, Tuna Tartare (+5)\n• Mains: Autograph Burger (dry-aged blend, gruyère, frites), Rigatoni Bolognese, Scottish Salmon (leek fondue), Chicken Paillard\n• Dessert: Warm Apple Tartlet, Chocolate Decadence, Artisanal Gelato","courses":[{"label":"Apps","items":["Truffle Pommes Frites","Caesar Salad","French Onion Soup","Tuna Tartare (+5)"],"text":"Truffle Pommes Frites, Caesar Salad, French Onion Soup, Tuna Tartare (+5)"},{"label":"Mains","items":["Autograph Burger (dry-aged blend","gruyère","frites)","Rigatoni Bolognese","Scottish Salmon (leek fondue)","Chicken Paillard"],"text":"Autograph Burger (dry-aged blend, gruyère, frites), Rigatoni Bolognese, Scottish Salmon (leek fondue), Chicken Paillard"},{"label":"Dessert","items":["Warm Apple Tartlet","Chocolate Decadence","Artisanal Gelato"],"text":"Warm Apple Tartlet, Chocolate Decadence, Artisanal Gelato"}]},"dinnerPrice":"$55","dPriceNum":55,"dinner":{"available":true,"header":"3 Courses ($55)","raw":"3 Courses ($55):\n• Apps: Jumbo Lump Crab Cake, Tuna Tartare, Beef Carpaccio, French Onion Soup, Caesar Salad\n• Mains: 8oz Prime Flat Iron Steak (truffle butter, frites), Veal Chop Milanese, Pan Roasted Sea Bass, Braised Short Rib Tortelloni\n• Dessert: Valrhona Chocolate Fondant, Warm Tarte Tatin, Grand Marnier Crème Brûlée","courses":[{"label":"Apps","items":["Jumbo Lump Crab Cake","Tuna Tartare","Beef Carpaccio","French Onion Soup","Caesar Salad"],"text":"Jumbo Lump Crab Cake, Tuna Tartare, Beef Carpaccio, French Onion Soup, Caesar Salad"},{"label":"Mains","items":["8oz Prime Flat Iron Steak (truffle butter","frites)","Veal Chop Milanese","Pan Roasted Sea Bass","Braised Short Rib Tortelloni"],"text":"8oz Prime Flat Iron Steak (truffle butter, frites), Veal Chop Milanese, Pan Roasted Sea Bass, Braised Short Rib Tortelloni"},{"label":"Dessert","items":["Valrhona Chocolate Fondant","Warm Tarte Tatin","Grand Marnier Crème Brûlée"],"text":"Valrhona Chocolate Fondant, Warm Tarte Tatin, Grand Marnier Crème Brûlée"}]},"rating":4.6,"reviews":1100,"cuisine":"American / Brasserie","address":"503 W Lancaster Ave, Wayne, PA 19087","phone":"(610) 964-2588","menuLink":"https://assets-mainlinetoday-com.s3-accelerate.amazonaws.com/2025/09/Autograph_MLRW_2026_Lunch-Dinner-Menu.pdf","website":"https://autographbrasserie.com","notes":"Top-tier Main Line power dining; 4.6 rating with 1,100+ reviews","lat":40.04538,"lng":-75.39822,"photo":"https://assets.mainlinetoday.com/2025/09/Autograph-rw-image.jpg","mltPage":"https://mainlinetoday.com/restaurant/autograph-brasserie/"},{"id":25,"name":"Terrain Cafe - Devon","town":"Devon","lunchPrice":"N/A","lPriceNum":0,"lunch":{"available":false,"raw":"N/A (Dinner only)","courses":[]},"dinnerPrice":"$45","dPriceNum":45,"dinner":{"available":true,"header":"3 Courses ($45)","raw":"3 Courses ($45):\n• Apps: Kennett Square Mushroom Soup, Harvest Squash Salad (pepitas, goat cheese), Cast Iron Skillet Cornbread (chili honey)\n• Mains: Seasonal Salmon (butternut purée, wild grains), Braised Short Rib Tagliatelle, Roasted Half Chicken (rosemary jus, root veg), Stuffed Acorn Squash\n• Dessert: Warm Apple Cider Cake (vanilla bean gelato), Flourless Dark Chocolate Torte","courses":[{"label":"Apps","items":["Kennett Square Mushroom Soup","Harvest Squash Salad (pepitas","goat cheese)","Cast Iron Skillet Cornbread (chili honey)"],"text":"Kennett Square Mushroom Soup, Harvest Squash Salad (pepitas, goat cheese), Cast Iron Skillet Cornbread (chili honey)"},{"label":"Mains","items":["Seasonal Salmon (butternut purée","wild grains)","Braised Short Rib Tagliatelle","Roasted Half Chicken (rosemary jus","root veg)","Stuffed Acorn Squash"],"text":"Seasonal Salmon (butternut purée, wild grains), Braised Short Rib Tagliatelle, Roasted Half Chicken (rosemary jus, root veg), Stuffed Acorn Squash"},{"label":"Dessert","items":["Warm Apple Cider Cake (vanilla bean gelato)","Flourless Dark Chocolate Torte"],"text":"Warm Apple Cider Cake (vanilla bean gelato), Flourless Dark Chocolate Torte"}]},"rating":4.5,"reviews":800,"cuisine":"American / Farm-to-Table","address":"138 Lancaster Ave, Devon, PA 19333","phone":"(610) 590-9898","menuLink":"https://assets-mainlinetoday-com.s3-accelerate.amazonaws.com/2025/09/TerrainCafe_MLTRestaurantWeek_Menus.pdf","website":"https://shopterrain.com/pages/devon-cafe","notes":"Gorgeous nursery and botanical greenhouse setting; 3 courses ($45)","lat":40.04595,"lng":-75.42212,"photo":"https://assets.mainlinetoday.com/2025/09/terrain-shakshuka-.jpg","mltPage":"https://mainlinetoday.com/restaurant/terrain-cafe-devon/"},{"id":26,"name":"Lola's Garden","town":"Ardmore","lunchPrice":"N/A","lPriceNum":0,"lunch":{"available":false,"raw":"N/A (Dinner only)","courses":[]},"dinnerPrice":"$45","dPriceNum":45,"dinner":{"available":true,"header":"3 Courses ($45)","raw":"3 Courses ($45):\n• Apps: Local Whipped Ricotta (truffle honey, sourdough), Harvest Beet Salad, Spicy Tuna Tartare, Pork Belly Steamed Buns\n• Mains: Seared Scottish Salmon (autumn squash, pomegranate glaze), Braised Short Rib Cavatelli, Lancaster Half Roast Chicken, Wild Mushroom Gnocchi\n• Dessert: Spiced Pumpkin Bread Pudding, Triple Chocolate Mousse, Seasonal Sorbet","courses":[{"label":"Apps","items":["Local Whipped Ricotta (truffle honey","sourdough)","Harvest Beet Salad","Spicy Tuna Tartare","Pork Belly Steamed Buns"],"text":"Local Whipped Ricotta (truffle honey, sourdough), Harvest Beet Salad, Spicy Tuna Tartare, Pork Belly Steamed Buns"},{"label":"Mains","items":["Seared Scottish Salmon (autumn squash","pomegranate glaze)","Braised Short Rib Cavatelli","Lancaster Half Roast Chicken","Wild Mushroom Gnocchi"],"text":"Seared Scottish Salmon (autumn squash, pomegranate glaze), Braised Short Rib Cavatelli, Lancaster Half Roast Chicken, Wild Mushroom Gnocchi"},{"label":"Dessert","items":["Spiced Pumpkin Bread Pudding","Triple Chocolate Mousse","Seasonal Sorbet"],"text":"Spiced Pumpkin Bread Pudding, Triple Chocolate Mousse, Seasonal Sorbet"}]},"rating":4.1,"reviews":520,"cuisine":"American / Wine & Beer Garden","address":"51 St Georges Rd, Ardmore, PA 19003","phone":"(484) 412-8011","menuLink":"https://assets-mainlinetoday-com.s3-accelerate.amazonaws.com/2025/09/Lolas-Garden-MLT-Restaurant-week-2026-menu.pdf","website":"https://lolasgardenrestaurant.com","notes":"Suburban Square botanical indoor/outdoor space; 3 courses ($45)","lat":40.00897,"lng":-75.28938,"photo":"https://assets.mainlinetoday.com/2026/10/LolasGarden_Fall26_Food.png","mltPage":"https://mainlinetoday.com/restaurant/lolas-garden/"},{"id":27,"name":"Ryan Christopher's BYOB","town":"Narberth","lunchPrice":"N/A","lPriceNum":0,"lunch":{"available":false,"raw":"N/A (Dinner only)","courses":[]},"dinnerPrice":"$55","dPriceNum":55,"dinner":{"available":true,"header":"3 Courses ($55)","raw":"3 Courses ($55):\n• Apps: Soup Du Jour, Stuffed Mushrooms (crab imperial), Crispy Calamari, Caprese Salad\n• Mains: Center Cut Filet Mignon (gorgonzola demi, mashed potatoes), Pan Seared Halibut (lemon caper butter), Veal Saltimbocca, Lobster Ravioli (+6)\n• Dessert: Warm Molten Chocolate Lava Cake, Tiramisu, Raspberry Sorbet","courses":[{"label":"Apps","items":["Soup Du Jour","Stuffed Mushrooms (crab imperial)","Crispy Calamari","Caprese Salad"],"text":"Soup Du Jour, Stuffed Mushrooms (crab imperial), Crispy Calamari, Caprese Salad"},{"label":"Mains","items":["Center Cut Filet Mignon (gorgonzola demi","mashed potatoes)","Pan Seared Halibut (lemon caper butter)","Veal Saltimbocca","Lobster Ravioli (+6)"],"text":"Center Cut Filet Mignon (gorgonzola demi, mashed potatoes), Pan Seared Halibut (lemon caper butter), Veal Saltimbocca, Lobster Ravioli (+6)"},{"label":"Dessert","items":["Warm Molten Chocolate Lava Cake","Tiramisu","Raspberry Sorbet"],"text":"Warm Molten Chocolate Lava Cake, Tiramisu, Raspberry Sorbet"}]},"rating":4.6,"reviews":254,"cuisine":"American / BYOB","address":"245 Woodbine Ave, Narberth, PA 19072","phone":"(610) 664-9282","menuLink":"https://assets-mainlinetoday-com.s3-accelerate.amazonaws.com/2025/09/Ryan-Christophers-MLTRW-Menu.pdf","website":"https://ryanchristophersbyob.com","notes":"Intimate, highly rated Narberth BYOB; 4 courses for $55","lat":40.00974,"lng":-75.25951,"photo":"https://assets.mainlinetoday.com/2026/10/Ryan-Christophers-photo-scaled.jpg","mltPage":"https://mainlinetoday.com/restaurant/ryan-christophers-byob/"},{"id":28,"name":"Sophie's BBQ","town":"Havertown","lunchPrice":"N/A","lPriceNum":0,"lunch":{"available":false,"raw":"N/A (Dinner only)","courses":[]},"dinnerPrice":"$45","dPriceNum":45,"dinner":{"available":true,"header":"3 Courses ($45)","raw":"3 Courses ($45):\n• Apps: Smoked Salmon Burnt Ends, Pulled Pork Eggrolls, Smoked Wings (dry rub or hot honey), Cornbread Skillet\n• Mains: 2-Meat BBQ Platter (brisket, ribs, pulled pork, or smoked turkey) w/ 2 sides (mac & cheese, collards, slaw, beans)\n• Dessert: Banana Pudding w/ Nilla wafers, Warm Peach Cobbler à la Mode","courses":[{"label":"Apps","items":["Smoked Salmon Burnt Ends","Pulled Pork Eggrolls","Smoked Wings (dry rub or hot honey)","Cornbread Skillet"],"text":"Smoked Salmon Burnt Ends, Pulled Pork Eggrolls, Smoked Wings (dry rub or hot honey), Cornbread Skillet"},{"label":"Mains","items":["2-Meat BBQ Platter (brisket","ribs","pulled pork","or smoked turkey) w/ 2 sides (mac & cheese","collards","slaw","beans)"],"text":"2-Meat BBQ Platter (brisket, ribs, pulled pork, or smoked turkey) w/ 2 sides (mac & cheese, collards, slaw, beans)"},{"label":"Dessert","items":["Banana Pudding w/ Nilla wafers","Warm Peach Cobbler à la Mode"],"text":"Banana Pudding w/ Nilla wafers, Warm Peach Cobbler à la Mode"}]},"rating":4.3,"reviews":448,"cuisine":"Barbecue","address":"1901 Darby Rd, Havertown, PA 19083","phone":"(610) 789-2227","menuLink":"https://assets-mainlinetoday-com.s3-accelerate.amazonaws.com/2025/09/Sophies-BBQ-2026-RESTAURANT-WEEK-MENU.pdf","website":"https://sophiesbbq.com","notes":"Wood-smoked slow cooked ribs, pulled pork & Texas brisket","lat":39.98425,"lng":-75.30692,"photo":"https://assets.mainlinetoday.com/2025/09/Sophies-BBQ-RW-Photo.jpg","mltPage":"https://mainlinetoday.com/restaurant/sophies-bbq/"},{"id":29,"name":"Terrain Café - Glen Mills","town":"Glen Mills","lunchPrice":"N/A","lPriceNum":0,"lunch":{"available":false,"raw":"N/A (Dinner only)","courses":[]},"dinnerPrice":"$45","dPriceNum":45,"dinner":{"available":true,"header":"3 Courses ($45)","raw":"3 Courses ($45):\n• Apps: Kennett Square Mushroom Soup, Harvest Squash Salad (pepitas, goat cheese), Cast Iron Skillet Cornbread (chili honey)\n• Mains: Seasonal Salmon (butternut purée, wild grains), Braised Short Rib Tagliatelle, Roasted Half Chicken (rosemary jus, root veg), Stuffed Acorn Squash\n• Dessert: Warm Apple Cider Cake (vanilla bean gelato), Flourless Dark Chocolate Torte","courses":[{"label":"Apps","items":["Kennett Square Mushroom Soup","Harvest Squash Salad (pepitas","goat cheese)","Cast Iron Skillet Cornbread (chili honey)"],"text":"Kennett Square Mushroom Soup, Harvest Squash Salad (pepitas, goat cheese), Cast Iron Skillet Cornbread (chili honey)"},{"label":"Mains","items":["Seasonal Salmon (butternut purée","wild grains)","Braised Short Rib Tagliatelle","Roasted Half Chicken (rosemary jus","root veg)","Stuffed Acorn Squash"],"text":"Seasonal Salmon (butternut purée, wild grains), Braised Short Rib Tagliatelle, Roasted Half Chicken (rosemary jus, root veg), Stuffed Acorn Squash"},{"label":"Dessert","items":["Warm Apple Cider Cake (vanilla bean gelato)","Flourless Dark Chocolate Torte"],"text":"Warm Apple Cider Cake (vanilla bean gelato), Flourless Dark Chocolate Torte"}]},"rating":3.9,"reviews":1268,"cuisine":"American / Farm-to-Table","address":"914 Baltimore Pike, Glen Mills, PA 19342","phone":"(610) 459-6030","menuLink":"https://assets-mainlinetoday-com.s3-accelerate.amazonaws.com/2025/09/TerrainCafe_MLTRestaurantWeek_Menus.pdf","website":"https://shopterrain.com/pages/glen-mills-cafe","notes":"Original flagship Terrain nursery cafe","lat":39.88424,"lng":-75.53293,"photo":"https://assets.mainlinetoday.com/2025/09/Terrian-Cafe-Picture-1-scaled.jpg","mltPage":"https://mainlinetoday.com/restaurant/terrain-cafe-glen-mills/"},{"id":30,"name":"The Silverspoon","town":"Wayne","lunchPrice":"N/A","lPriceNum":0,"lunch":{"available":false,"raw":"N/A (Dinner only)","courses":[]},"dinnerPrice":"$55","dPriceNum":55,"dinner":{"available":true,"header":"3 Courses ($55)","raw":"3 Courses ($55):\n• Apps: Short Rib Dumplings (demi glacé, horseradish aioli), Signature Mushroom Bisque, Beet Salad (shallot champagne vinaigrette, goat cheese)\n• Mains: Airline Chicken Sofrito (fingerling potatoes, pineapple pico), Pan Seared Salmon Beurre Blanc (purple cauliflower), Veal Ravioli (truffle cream)\n• Dessert: Dessert Trio (truffle, dipped strawberry, cookie), Nutella Mousse, House Made Ice Cream","courses":[{"label":"Apps","items":["Short Rib Dumplings (demi glacé","horseradish aioli)","Signature Mushroom Bisque","Beet Salad (shallot champagne vinaigrette","goat cheese)"],"text":"Short Rib Dumplings (demi glacé, horseradish aioli), Signature Mushroom Bisque, Beet Salad (shallot champagne vinaigrette, goat cheese)"},{"label":"Mains","items":["Airline Chicken Sofrito (fingerling potatoes","pineapple pico)","Pan Seared Salmon Beurre Blanc (purple cauliflower)","Veal Ravioli (truffle cream)"],"text":"Airline Chicken Sofrito (fingerling potatoes, pineapple pico), Pan Seared Salmon Beurre Blanc (purple cauliflower), Veal Ravioli (truffle cream)"},{"label":"Dessert","items":["Dessert Trio (truffle","dipped strawberry","cookie)","Nutella Mousse","House Made Ice Cream"],"text":"Dessert Trio (truffle, dipped strawberry, cookie), Nutella Mousse, House Made Ice Cream"}]},"rating":4.4,"reviews":315,"cuisine":"American / BYOB","address":"503 W. Lancaster Ave, Wayne, PA 19087","phone":"(610) 688-7646","menuLink":"https://assets-mainlinetoday-com.s3-accelerate.amazonaws.com/2025/09/The-Silverspoon-MLTRW-Dinner-Menu.pdf","website":"https://silverspoonwayne.com","notes":"Eagle Village Shops BYOB; Short Rib Dumplings & Veal Ravioli","lat":40.04575,"lng":-75.39875,"photo":"https://assets.mainlinetoday.com/2024/01/mlt-cover.jpg","mltPage":"https://mainlinetoday.com/restaurant/the-silverspoon/"},{"id":31,"name":"At the Table","town":"Wayne","lunchPrice":"N/A","lPriceNum":0,"lunch":{"available":false,"raw":"N/A (Dinner only)","courses":[]},"dinnerPrice":"$55","dPriceNum":55,"dinner":{"available":true,"header":"3 Courses ($55)","raw":"3 Courses ($55):\n• Apps: French Onion Soup (Gruyère, Comté, sherry), Burrata Salad (poached pear, pecans), Wild Mushroom Arancini (parmesan fondue, crispy sage)\n• Mains: Seared Ora King Salmon (white beans, wilted kale, lemon beurre blanc), Dry Aged Prime Hanger Steak (potato purée, bordelaise), Pumpkin Ravioli (brown butter sage)\n• Dessert: Warm Apple Crisp à la Mode, Chocolate Pots de Crème, Lemon Posset (cranberry compote)","courses":[{"label":"Apps","items":["French Onion Soup (Gruyère","Comté","sherry)","Burrata Salad (poached pear","pecans)","Wild Mushroom Arancini (parmesan fondue","crispy sage)"],"text":"French Onion Soup (Gruyère, Comté, sherry), Burrata Salad (poached pear, pecans), Wild Mushroom Arancini (parmesan fondue, crispy sage)"},{"label":"Mains","items":["Seared Ora King Salmon (white beans","wilted kale","lemon beurre blanc)","Dry Aged Prime Hanger Steak (potato purée","bordelaise)","Pumpkin Ravioli (brown butter sage)"],"text":"Seared Ora King Salmon (white beans, wilted kale, lemon beurre blanc), Dry Aged Prime Hanger Steak (potato purée, bordelaise), Pumpkin Ravioli (brown butter sage)"},{"label":"Dessert","items":["Warm Apple Crisp à la Mode","Chocolate Pots de Crème","Lemon Posset (cranberry compote)"],"text":"Warm Apple Crisp à la Mode, Chocolate Pots de Crème, Lemon Posset (cranberry compote)"}]},"rating":4.6,"reviews":430,"cuisine":"Fine Dining / French-American","address":"118 W Lancaster Ave, Wayne, PA 19087","phone":"(610) 964-9700","menuLink":"https://assets-mainlinetoday-com.s3-accelerate.amazonaws.com/2025/09/At-the-Table-MLTRW-2026-menu.pdf","website":"https://atthetablewayne.com","notes":"#1 Fine dining recommendation: Ora King Salmon & Dry-Aged Hanger Steak at $55 is unmatched value","lat":40.04388,"lng":-75.38655,"photo":"https://assets.mainlinetoday.com/2025/10/At-the-Table-MLTRW-Photo.jpg","mltPage":"https://mainlinetoday.com/restaurant/at-the-table/"},{"id":32,"name":"La Belle Epoque Bistro","town":"Media","lunchPrice":"N/A","lPriceNum":0,"lunch":{"available":false,"raw":"N/A (Dinner only)","courses":[]},"dinnerPrice":"$55","dPriceNum":55,"dinner":{"available":true,"header":"3 Courses ($55)","raw":"3 Courses ($55):\n• Apps: Chèvre Fouetté (goat cheese mousse, fig jam, strawberries), Escargots de Bourgogne (garlic herb butter), French Onion Gratinée, Pâté de Campagne\n• Mains: Boeuf Bourguignon (braised beef, red wine, pearl onions, pommes purée), Duck Confit, Trout Meunière (toasted almonds), Steak Frites\n• Dessert: Warm Chocolate Soufflé, Traditional Crème Brûlée, Profiteroles au Chocolat","courses":[{"label":"Apps","items":["Chèvre Fouetté (goat cheese mousse","fig jam","strawberries)","Escargots de Bourgogne (garlic herb butter)","French Onion Gratinée","Pâté de Campagne"],"text":"Chèvre Fouetté (goat cheese mousse, fig jam, strawberries), Escargots de Bourgogne (garlic herb butter), French Onion Gratinée, Pâté de Campagne"},{"label":"Mains","items":["Boeuf Bourguignon (braised beef","red wine","pearl onions","pommes purée)","Duck Confit","Trout Meunière (toasted almonds)","Steak Frites"],"text":"Boeuf Bourguignon (braised beef, red wine, pearl onions, pommes purée), Duck Confit, Trout Meunière (toasted almonds), Steak Frites"},{"label":"Dessert","items":["Warm Chocolate Soufflé","Traditional Crème Brûlée","Profiteroles au Chocolat"],"text":"Warm Chocolate Soufflé, Traditional Crème Brûlée, Profiteroles au Chocolat"}]},"rating":4.6,"reviews":490,"cuisine":"French / Wine Bistro","address":"38 W. State St, Media, PA 19063","phone":"(610) 566-6808","menuLink":"https://assets-mainlinetoday-com.s3-accelerate.amazonaws.com/2025/09/LaBelleOption1.pdf","website":"https://labellebistro.com","notes":"Classic French bistro on State St; Escargots, Boeuf Bourguignon, Profiteroles","lat":39.91803,"lng":-75.3905,"photo":"https://assets.mainlinetoday.com/2024/01/mlt-cover.jpg","mltPage":"https://mainlinetoday.com/restaurant/la-belle-epoque-bistro/"},{"id":33,"name":"Estia Taverna","town":"Radnor","lunchPrice":"N/A","lPriceNum":0,"lunch":{"available":false,"raw":"N/A (Dinner only)","courses":[]},"dinnerPrice":"$55","dPriceNum":55,"dinner":{"available":true,"header":"3 Courses ($55)","raw":"3 Courses ($55):\n• Apps: Spreads Pikilia (tzatziki, htipiti, melitzanosalata w/ pita), Spanakopita, Charcoal-Grilled Octopodi (+5), Classic Greek Horiatiki Salad\n• Mains: Fresh Whole Mediterranean Lavraki (sea bass), Grilled Australian Lamb Chops (Greek fried potatoes), Organic Roasted Chicken over orzo, Papoutsakia (eggplant w/ feta)\n• Dessert: Traditional Baklava Rolls (vanilla gelato), Kormo (chocolate fudge rolled w/ biscuits), Greek Artisanal Yogurt w/ Thyme Honey","courses":[{"label":"Apps","items":["Spreads Pikilia (tzatziki","htipiti","melitzanosalata w/ pita)","Spanakopita","Charcoal-Grilled Octopodi (+5)","Classic Greek Horiatiki Salad"],"text":"Spreads Pikilia (tzatziki, htipiti, melitzanosalata w/ pita), Spanakopita, Charcoal-Grilled Octopodi (+5), Classic Greek Horiatiki Salad"},{"label":"Mains","items":["Fresh Whole Mediterranean Lavraki (sea bass)","Grilled Australian Lamb Chops (Greek fried potatoes)","Organic Roasted Chicken over orzo","Papoutsakia (eggplant w/ feta)"],"text":"Fresh Whole Mediterranean Lavraki (sea bass), Grilled Australian Lamb Chops (Greek fried potatoes), Organic Roasted Chicken over orzo, Papoutsakia (eggplant w/ feta)"},{"label":"Dessert","items":["Traditional Baklava Rolls (vanilla gelato)","Kormo (chocolate fudge rolled w/ biscuits)","Greek Artisanal Yogurt w/ Thyme Honey"],"text":"Traditional Baklava Rolls (vanilla gelato), Kormo (chocolate fudge rolled w/ biscuits), Greek Artisanal Yogurt w/ Thyme Honey"}]},"rating":4.5,"reviews":900,"cuisine":"Greek / Seafood","address":"222 N. Radnor-Chester Rd, Radnor, PA 19087","phone":"(484) 581-7124","menuLink":"https://assets-mainlinetoday-com.s3-accelerate.amazonaws.com/2025/09/Estia-Restaurant-Week-2026-Menu.pdf","website":"https://estiataverna.com","notes":"Premier Greek Mediterranean dining; whole fresh fish & grilled octopus","lat":40.04104,"lng":-75.36345,"photo":"https://assets.mainlinetoday.com/2025/09/Estia-Taverna-Rw-photo.jpg","mltPage":"https://mainlinetoday.com/restaurant/estia-taverna/"},{"id":34,"name":"White Dog Cafe Glen Mills","town":"Glen Mills","lunchPrice":"$30","lPriceNum":30,"lunch":{"available":true,"header":"3 Courses ($30)","raw":"3 Courses ($30):\n• Apps: Kennett Square Mushroom Soup (truffle crème fraîche), Autumn Squash Bisque, PA Cheddar & Potato Pierogies, Local Beet Salad\n• Mains: Green Meadow Farm Double Cheddar Burger (bacon jam, truffle frites), Spicy Lamb Bolognese, Fall Harvest Grain Bowl, Crispy Chicken Sandwich\n• Dessert: Warm Apple Bread Pudding, Pumpkin Cheesecake, Salted Caramel Ice Cream","courses":[{"label":"Apps","items":["Kennett Square Mushroom Soup (truffle crème fraîche)","Autumn Squash Bisque","PA Cheddar & Potato Pierogies","Local Beet Salad"],"text":"Kennett Square Mushroom Soup (truffle crème fraîche), Autumn Squash Bisque, PA Cheddar & Potato Pierogies, Local Beet Salad"},{"label":"Mains","items":["Green Meadow Farm Double Cheddar Burger (bacon jam","truffle frites)","Spicy Lamb Bolognese","Fall Harvest Grain Bowl","Crispy Chicken Sandwich"],"text":"Green Meadow Farm Double Cheddar Burger (bacon jam, truffle frites), Spicy Lamb Bolognese, Fall Harvest Grain Bowl, Crispy Chicken Sandwich"},{"label":"Dessert","items":["Warm Apple Bread Pudding","Pumpkin Cheesecake","Salted Caramel Ice Cream"],"text":"Warm Apple Bread Pudding, Pumpkin Cheesecake, Salted Caramel Ice Cream"}]},"dinnerPrice":"$45","dPriceNum":45,"dinner":{"available":true,"header":"3 Courses ($45)","raw":"3 Courses ($45):\n• Apps: Kennett Square Mushroom Soup (truffle crème fraîche), Autumn Squash Bisque, PA Noble Cheddar Pierogies, Roasted Beet & Goat Cheese\n• Mains: Lancaster Free-Range Roast Chicken (potatoes, herb jus), Spicy Lamb Bolognese (casarecce, ricotta), Loch Duart Salmon (wild rice, apple slaw), Braised Short Rib (+8)\n• Dessert: Warm Apple Bread Pudding (caramel gelato), Pumpkin Spiced Cheesecake, Flourless Chocolate Cake","courses":[{"label":"Apps","items":["Kennett Square Mushroom Soup (truffle crème fraîche)","Autumn Squash Bisque","PA Noble Cheddar Pierogies","Roasted Beet & Goat Cheese"],"text":"Kennett Square Mushroom Soup (truffle crème fraîche), Autumn Squash Bisque, PA Noble Cheddar Pierogies, Roasted Beet & Goat Cheese"},{"label":"Mains","items":["Lancaster Free-Range Roast Chicken (potatoes","herb jus)","Spicy Lamb Bolognese (casarecce","ricotta)","Loch Duart Salmon (wild rice","apple slaw)","Braised Short Rib (+8)"],"text":"Lancaster Free-Range Roast Chicken (potatoes, herb jus), Spicy Lamb Bolognese (casarecce, ricotta), Loch Duart Salmon (wild rice, apple slaw), Braised Short Rib (+8)"},{"label":"Dessert","items":["Warm Apple Bread Pudding (caramel gelato)","Pumpkin Spiced Cheesecake","Flourless Chocolate Cake"],"text":"Warm Apple Bread Pudding (caramel gelato), Pumpkin Spiced Cheesecake, Flourless Chocolate Cake"}]},"rating":4.5,"reviews":850,"cuisine":"American / Farm-to-Table","address":"981 Baltimore Pike, Glen Mills, PA 19342","phone":"(610) 822-2100","menuLink":"https://assets-mainlinetoday-com.s3-accelerate.amazonaws.com/2025/09/White-Dog-GM-Lunch-Dinner-Menu.pdf","website":"https://whitedog.com","notes":"Farm-to-table lunch ($30) & dinner ($45)","lat":39.88388,"lng":-75.53525,"photo":"https://assets.mainlinetoday.com/2026/10/WhiteDogGlennMills-scaled.jpg","mltPage":"https://mainlinetoday.com/restaurant/white-dog-cafe-glen-mills/"},{"id":35,"name":"White Dog Cafe Haverford","town":"Haverford","lunchPrice":"$30","lPriceNum":30,"lunch":{"available":true,"header":"3 Courses ($30)","raw":"3 Courses ($30):\n• Apps: Kennett Square Mushroom Soup (truffle crème fraîche), Autumn Squash Bisque, PA Cheddar & Potato Pierogies, Local Beet Salad\n• Mains: Green Meadow Farm Double Cheddar Burger (bacon jam, truffle frites), Spicy Lamb Bolognese, Fall Harvest Grain Bowl, Crispy Chicken Sandwich\n• Dessert: Warm Apple Bread Pudding, Pumpkin Cheesecake, Salted Caramel Ice Cream","courses":[{"label":"Apps","items":["Kennett Square Mushroom Soup (truffle crème fraîche)","Autumn Squash Bisque","PA Cheddar & Potato Pierogies","Local Beet Salad"],"text":"Kennett Square Mushroom Soup (truffle crème fraîche), Autumn Squash Bisque, PA Cheddar & Potato Pierogies, Local Beet Salad"},{"label":"Mains","items":["Green Meadow Farm Double Cheddar Burger (bacon jam","truffle frites)","Spicy Lamb Bolognese","Fall Harvest Grain Bowl","Crispy Chicken Sandwich"],"text":"Green Meadow Farm Double Cheddar Burger (bacon jam, truffle frites), Spicy Lamb Bolognese, Fall Harvest Grain Bowl, Crispy Chicken Sandwich"},{"label":"Dessert","items":["Warm Apple Bread Pudding","Pumpkin Cheesecake","Salted Caramel Ice Cream"],"text":"Warm Apple Bread Pudding, Pumpkin Cheesecake, Salted Caramel Ice Cream"}]},"dinnerPrice":"$45","dPriceNum":45,"dinner":{"available":true,"header":"3 Courses ($45)","raw":"3 Courses ($45):\n• Apps: Kennett Square Mushroom Soup (truffle crème fraîche), Autumn Squash Bisque, PA Noble Cheddar Pierogies, Roasted Beet & Goat Cheese\n• Mains: Lancaster Free-Range Roast Chicken (potatoes, herb jus), Spicy Lamb Bolognese (casarecce, ricotta), Loch Duart Salmon (wild rice, apple slaw), Braised Short Rib (+8)\n• Dessert: Warm Apple Bread Pudding (caramel gelato), Pumpkin Spiced Cheesecake, Flourless Chocolate Cake","courses":[{"label":"Apps","items":["Kennett Square Mushroom Soup (truffle crème fraîche)","Autumn Squash Bisque","PA Noble Cheddar Pierogies","Roasted Beet & Goat Cheese"],"text":"Kennett Square Mushroom Soup (truffle crème fraîche), Autumn Squash Bisque, PA Noble Cheddar Pierogies, Roasted Beet & Goat Cheese"},{"label":"Mains","items":["Lancaster Free-Range Roast Chicken (potatoes","herb jus)","Spicy Lamb Bolognese (casarecce","ricotta)","Loch Duart Salmon (wild rice","apple slaw)","Braised Short Rib (+8)"],"text":"Lancaster Free-Range Roast Chicken (potatoes, herb jus), Spicy Lamb Bolognese (casarecce, ricotta), Loch Duart Salmon (wild rice, apple slaw), Braised Short Rib (+8)"},{"label":"Dessert","items":["Warm Apple Bread Pudding (caramel gelato)","Pumpkin Spiced Cheesecake","Flourless Chocolate Cake"],"text":"Warm Apple Bread Pudding (caramel gelato), Pumpkin Spiced Cheesecake, Flourless Chocolate Cake"}]},"rating":4.5,"reviews":620,"cuisine":"American / Farm-to-Table","address":"379 Lancaster Ave, Haverford, PA 19041","phone":"(610) 896-4556","menuLink":"https://assets-mainlinetoday-com.s3-accelerate.amazonaws.com/2025/09/White-Dog-Haverford-Lunch-Dinner-menu.pdf","website":"https://whitedog.com","notes":"Haverford location with cozy whimsical decor","lat":40.01262,"lng":-75.30028,"photo":"https://assets.mainlinetoday.com/2026/10/WDH-salmon-entree-scaled.jpg","mltPage":"https://mainlinetoday.com/restaurant/white-dog-cafe-haverford/"},{"id":36,"name":"White Dog Cafe Wayne","town":"Wayne","lunchPrice":"$30","lPriceNum":30,"lunch":{"available":true,"header":"3 Courses ($30)","raw":"3 Courses ($30):\n• Apps: Kennett Square Mushroom Soup (truffle crème fraîche), Autumn Squash Bisque, PA Cheddar & Potato Pierogies, Local Beet Salad\n• Mains: Green Meadow Farm Double Cheddar Burger (bacon jam, truffle frites), Spicy Lamb Bolognese, Fall Harvest Grain Bowl, Crispy Chicken Sandwich\n• Dessert: Warm Apple Bread Pudding, Pumpkin Cheesecake, Salted Caramel Ice Cream","courses":[{"label":"Apps","items":["Kennett Square Mushroom Soup (truffle crème fraîche)","Autumn Squash Bisque","PA Cheddar & Potato Pierogies","Local Beet Salad"],"text":"Kennett Square Mushroom Soup (truffle crème fraîche), Autumn Squash Bisque, PA Cheddar & Potato Pierogies, Local Beet Salad"},{"label":"Mains","items":["Green Meadow Farm Double Cheddar Burger (bacon jam","truffle frites)","Spicy Lamb Bolognese","Fall Harvest Grain Bowl","Crispy Chicken Sandwich"],"text":"Green Meadow Farm Double Cheddar Burger (bacon jam, truffle frites), Spicy Lamb Bolognese, Fall Harvest Grain Bowl, Crispy Chicken Sandwich"},{"label":"Dessert","items":["Warm Apple Bread Pudding","Pumpkin Cheesecake","Salted Caramel Ice Cream"],"text":"Warm Apple Bread Pudding, Pumpkin Cheesecake, Salted Caramel Ice Cream"}]},"dinnerPrice":"$45","dPriceNum":45,"dinner":{"available":true,"header":"3 Courses ($45)","raw":"3 Courses ($45):\n• Apps: Kennett Square Mushroom Soup (truffle crème fraîche), Autumn Squash Bisque, PA Noble Cheddar Pierogies, Roasted Beet & Goat Cheese\n• Mains: Lancaster Free-Range Roast Chicken (potatoes, herb jus), Spicy Lamb Bolognese (casarecce, ricotta), Loch Duart Salmon (wild rice, apple slaw), Braised Short Rib (+8)\n• Dessert: Warm Apple Bread Pudding (caramel gelato), Pumpkin Spiced Cheesecake, Flourless Chocolate Cake","courses":[{"label":"Apps","items":["Kennett Square Mushroom Soup (truffle crème fraîche)","Autumn Squash Bisque","PA Noble Cheddar Pierogies","Roasted Beet & Goat Cheese"],"text":"Kennett Square Mushroom Soup (truffle crème fraîche), Autumn Squash Bisque, PA Noble Cheddar Pierogies, Roasted Beet & Goat Cheese"},{"label":"Mains","items":["Lancaster Free-Range Roast Chicken (potatoes","herb jus)","Spicy Lamb Bolognese (casarecce","ricotta)","Loch Duart Salmon (wild rice","apple slaw)","Braised Short Rib (+8)"],"text":"Lancaster Free-Range Roast Chicken (potatoes, herb jus), Spicy Lamb Bolognese (casarecce, ricotta), Loch Duart Salmon (wild rice, apple slaw), Braised Short Rib (+8)"},{"label":"Dessert","items":["Warm Apple Bread Pudding (caramel gelato)","Pumpkin Spiced Cheesecake","Flourless Chocolate Cake"],"text":"Warm Apple Bread Pudding (caramel gelato), Pumpkin Spiced Cheesecake, Flourless Chocolate Cake"}]},"rating":4.4,"reviews":1500,"cuisine":"American / Farm-to-Table","address":"200 W Lancaster Ave, Wayne, PA 19087","phone":"(610) 225-3700","menuLink":"https://assets-mainlinetoday-com.s3-accelerate.amazonaws.com/2025/09/White-Dog-Wayne-Lunch-Dinner-menu.pdf","website":"https://whitedog.com","notes":"Center of Wayne; high consistency & seasonal favorites","lat":40.04402,"lng":-75.38835,"photo":"https://assets.mainlinetoday.com/2026/10/WD-Impossible-Burger-scaled.jpg","mltPage":"https://mainlinetoday.com/restaurant/white-dog-cafe-wayne/"},{"id":37,"name":"Tavola Restaurant & Bar","town":"Springfield","lunchPrice":"N/A","lPriceNum":0,"lunch":{"available":false,"raw":"N/A (Dinner only)","courses":[]},"dinnerPrice":"$45","dPriceNum":45,"dinner":{"available":true,"header":"3 Courses ($45)","raw":"3 Courses ($45):\n• Apps: Truffle Parmesan Arancini, Autumn Harvest Salad, Calamari Fritti, Butternut Squash Soup\n• Mains: Braised Beef Short Rib (creamy polenta), Pan Seared Salmon (butternut risotto), Chicken Milanese (arugula, shaved parm), Cavatelli Rustica\n• Dessert: Warm Apple Caramel Tart, Classic Tiramisu, Gelato Trio","courses":[{"label":"Apps","items":["Truffle Parmesan Arancini","Autumn Harvest Salad","Calamari Fritti","Butternut Squash Soup"],"text":"Truffle Parmesan Arancini, Autumn Harvest Salad, Calamari Fritti, Butternut Squash Soup"},{"label":"Mains","items":["Braised Beef Short Rib (creamy polenta)","Pan Seared Salmon (butternut risotto)","Chicken Milanese (arugula","shaved parm)","Cavatelli Rustica"],"text":"Braised Beef Short Rib (creamy polenta), Pan Seared Salmon (butternut risotto), Chicken Milanese (arugula, shaved parm), Cavatelli Rustica"},{"label":"Dessert","items":["Warm Apple Caramel Tart","Classic Tiramisu","Gelato Trio"],"text":"Warm Apple Caramel Tart, Classic Tiramisu, Gelato Trio"}]},"rating":4.1,"reviews":520,"cuisine":"American / Italian","address":"400 W. Sproul Rd, Springfield, PA 19064","phone":"(610) 543-2100","menuLink":"https://assets-mainlinetoday-com.s3-accelerate.amazonaws.com/2025/09/Tavola-MLT-2026-Restaurant-Week-Menu.pdf","website":"https://tavolas.com","notes":"Country Club setting with golf course views","lat":39.92642,"lng":-75.34962,"photo":"https://assets.mainlinetoday.com/2025/09/Tavola-RW-Photo.jpg","mltPage":"https://mainlinetoday.com/restaurant/tavola-restaurant-bar/"},{"id":38,"name":"Rosalie","town":"Wayne","lunchPrice":"$30","lPriceNum":30,"lunch":{"available":true,"header":"3 Courses ($30)","raw":"3 Courses ($30):\n• Apps: Crispy Calamari, Caesar Salad (white anchovy, croutons), Arancini (saffron, taleggio), Tuscan Kale Salad\n• Mains: House-Made Rigatoni (pork sugo, pecorino), Chicken Cutlet Sandwich (broccoli rabe, provolone, frites), Verlasso Salmon, Margherita Pizza\n• Dessert: Warm Olive Oil Cake, Chocolate Cannoli, Seasonal Gelato","courses":[{"label":"Apps","items":["Crispy Calamari","Caesar Salad (white anchovy","croutons)","Arancini (saffron","taleggio)","Tuscan Kale Salad"],"text":"Crispy Calamari, Caesar Salad (white anchovy, croutons), Arancini (saffron, taleggio), Tuscan Kale Salad"},{"label":"Mains","items":["House-Made Rigatoni (pork sugo","pecorino)","Chicken Cutlet Sandwich (broccoli rabe","provolone","frites)","Verlasso Salmon","Margherita Pizza"],"text":"House-Made Rigatoni (pork sugo, pecorino), Chicken Cutlet Sandwich (broccoli rabe, provolone, frites), Verlasso Salmon, Margherita Pizza"},{"label":"Dessert","items":["Warm Olive Oil Cake","Chocolate Cannoli","Seasonal Gelato"],"text":"Warm Olive Oil Cake, Chocolate Cannoli, Seasonal Gelato"}]},"dinnerPrice":"$45","dPriceNum":45,"dinner":{"available":true,"header":"3 Courses ($45)","raw":"3 Courses ($45):\n• Apps: Arancini (saffron, fontina), Beef Carpaccio, Burrata (figs, saba), Caesar Salad, Warm Polenta\n• Mains: Verlasso Salmon (fennel purée, salsa verde), Hand-Rolled Gnocchi (lamb ragù), Chicken Parmesan (spaghetti marinara), Pork Chop Milanese\n• Dessert: Tiramisu, Warm Olive Oil Cake (orange marmellata), Dark Chocolate Budino","courses":[{"label":"Apps","items":["Arancini (saffron","fontina)","Beef Carpaccio","Burrata (figs","saba)","Caesar Salad","Warm Polenta"],"text":"Arancini (saffron, fontina), Beef Carpaccio, Burrata (figs, saba), Caesar Salad, Warm Polenta"},{"label":"Mains","items":["Verlasso Salmon (fennel purée","salsa verde)","Hand-Rolled Gnocchi (lamb ragù)","Chicken Parmesan (spaghetti marinara)","Pork Chop Milanese"],"text":"Verlasso Salmon (fennel purée, salsa verde), Hand-Rolled Gnocchi (lamb ragù), Chicken Parmesan (spaghetti marinara), Pork Chop Milanese"},{"label":"Dessert","items":["Tiramisu","Warm Olive Oil Cake (orange marmellata)","Dark Chocolate Budino"],"text":"Tiramisu, Warm Olive Oil Cake (orange marmellata), Dark Chocolate Budino"}]},"rating":4.4,"reviews":400,"cuisine":"Italian Soul Food","address":"139 E. Lancaster Ave, Wayne, PA 19087","phone":"(610) 977-0600","menuLink":"https://assets-mainlinetoday-com.s3-accelerate.amazonaws.com/2025/09/Rosalie-Lunch-Dinner-Menu.pdf","website":"https://rosaliewayne.com","notes":"The Wayne Hotel; rustic Italian, house-made pastas, stylish lounge","lat":40.04438,"lng":-75.3859,"photo":"https://assets.mainlinetoday.com/2026/10/Rosalie-scaled.jpg","mltPage":"https://mainlinetoday.com/restaurant/rosalie/"},{"id":39,"name":"The Refectory","town":"Villanova","lunchPrice":"$25","lPriceNum":25,"lunch":{"available":true,"header":"3 Courses ($25)","raw":"3 Courses ($25):\n• Apps: Tavern French Onion Soup, Caesar Salad, Crispy Fried Brussels (hot honey)\n• Mains: Refectory Double Burger (special sauce, fries), Turkey Club, Wild Mushroom Bucatini, Fish & Chips\n• Dessert: Warm Chocolate Chip Skillet Cookie, Vanilla Bean Panna Cotta","courses":[{"label":"Apps","items":["Tavern French Onion Soup","Caesar Salad","Crispy Fried Brussels (hot honey)"],"text":"Tavern French Onion Soup, Caesar Salad, Crispy Fried Brussels (hot honey)"},{"label":"Mains","items":["Refectory Double Burger (special sauce","fries)","Turkey Club","Wild Mushroom Bucatini","Fish & Chips"],"text":"Refectory Double Burger (special sauce, fries), Turkey Club, Wild Mushroom Bucatini, Fish & Chips"},{"label":"Dessert","items":["Warm Chocolate Chip Skillet Cookie","Vanilla Bean Panna Cotta"],"text":"Warm Chocolate Chip Skillet Cookie, Vanilla Bean Panna Cotta"}]},"dinnerPrice":"$55","dPriceNum":55,"dinner":{"available":true,"header":"3 Courses ($55)","raw":"3 Courses ($55):\n• Apps: French Onion Soup, Jumbo Lump Crab Cake, Burrata & Grilled Peaches, Steak Tartare\n• Mains: 8oz Prime NY Strip Steak (demi-glace, truffle mash), Pan Roasted Halibut, Short Rib Ragu over Pappardelle, Roasted Half Chicken\n• Dessert: Sticky Toffee Pudding, New York Cheesecake, Molten Chocolate Cake","courses":[{"label":"Apps","items":["French Onion Soup","Jumbo Lump Crab Cake","Burrata & Grilled Peaches","Steak Tartare"],"text":"French Onion Soup, Jumbo Lump Crab Cake, Burrata & Grilled Peaches, Steak Tartare"},{"label":"Mains","items":["8oz Prime NY Strip Steak (demi-glace","truffle mash)","Pan Roasted Halibut","Short Rib Ragu over Pappardelle","Roasted Half Chicken"],"text":"8oz Prime NY Strip Steak (demi-glace, truffle mash), Pan Roasted Halibut, Short Rib Ragu over Pappardelle, Roasted Half Chicken"},{"label":"Dessert","items":["Sticky Toffee Pudding","New York Cheesecake","Molten Chocolate Cake"],"text":"Sticky Toffee Pudding, New York Cheesecake, Molten Chocolate Cake"}]},"rating":4.3,"reviews":300,"cuisine":"American / Tavern","address":"862 Lancaster Ave, Villanova, PA 19085","phone":"(610) 519-5786","menuLink":"https://assets-mainlinetoday-com.s3-accelerate.amazonaws.com/2025/09/The-Refectory-2026-Lunch-Dinner-Menu.pdf","website":"https://refectorynova.com","notes":"Villanova campus dining; great $25 lunch deal","lat":40.03426,"lng":-75.34087,"photo":"https://assets.mainlinetoday.com/2025/09/The-Refectory-MLTRW-Photo-Cravers.png","mltPage":"https://mainlinetoday.com/restaurant/the-refectory/"},{"id":40,"name":"Limoncello, West Chester","town":"West Chester","lunchPrice":"N/A","lPriceNum":0,"lunch":{"available":false,"raw":"N/A (Dinner only)","courses":[]},"dinnerPrice":"$55","dPriceNum":55,"dinner":{"available":true,"header":"3 Courses ($55)","raw":"3 Courses ($55):\n• Apps: Arancini, Meatball Eggrolls, Calamari & Shrimp Siciliani, Escarole Soup, Mussels Amatriciana, Beet Salad, Crispy Brussels\n• Mains: Chicken Limoncello, Braised Short Rib, Lobster Tagliatelle (+5), Gnocchi al Pesto, Veal Saltimbocca (+5), Stuffed Flounder, Salmon Limoncello, Pear Sacchetti\n• Dessert: Limoncello Cake, Cannoli, Tiramisu, Gelato/Sorbet","courses":[{"label":"Apps","items":["Arancini","Meatball Eggrolls","Calamari & Shrimp Siciliani","Escarole Soup","Mussels Amatriciana","Beet Salad","Crispy Brussels"],"text":"Arancini, Meatball Eggrolls, Calamari & Shrimp Siciliani, Escarole Soup, Mussels Amatriciana, Beet Salad, Crispy Brussels"},{"label":"Mains","items":["Chicken Limoncello","Braised Short Rib","Lobster Tagliatelle (+5)","Gnocchi al Pesto","Veal Saltimbocca (+5)","Stuffed Flounder","Salmon Limoncello","Pear Sacchetti"],"text":"Chicken Limoncello, Braised Short Rib, Lobster Tagliatelle (+5), Gnocchi al Pesto, Veal Saltimbocca (+5), Stuffed Flounder, Salmon Limoncello, Pear Sacchetti"},{"label":"Dessert","items":["Limoncello Cake","Cannoli","Tiramisu","Gelato/Sorbet"],"text":"Limoncello Cake, Cannoli, Tiramisu, Gelato/Sorbet"}]},"rating":4.4,"reviews":2800,"cuisine":"Italian","address":"9 N Walnut St, West Chester, PA 19380","phone":"(610) 436-6230","menuLink":"https://assets-mainlinetoday-com.s3-accelerate.amazonaws.com/2026/10/Limoncello-MLTRW-Menu.pdf","website":"https://limoncellorestaurant.com","notes":"Downtown West Chester staple with 2,800+ reviews; generous portions","lat":39.96057,"lng":-75.60346,"photo":"https://assets.mainlinetoday.com/2024/01/mlt-cover.jpg","mltPage":"https://mainlinetoday.com/restaurant/limoncello/"},{"id":41,"name":"General Warren","town":"Malvern","lunchPrice":"N/A","lPriceNum":0,"lunch":{"available":false,"raw":"N/A (Dinner only)","courses":[]},"dinnerPrice":"$55","dPriceNum":55,"dinner":{"available":true,"header":"3 Courses ($55)","raw":"3 Courses ($55):\n• Apps: Classic French Onion Soup, Kennett Square Snapping Turtle Soup, Warren House Salad, Colossal Shrimp Cocktail (+4)\n• Mains: General Warren Famous Beef Wellington (mushroom duxelles, puff pastry, cabernet demi), Jumbo Lump Crab Cakes, Pan Seared Salmon, Roast Duckling\n• Dessert: Warm Apple Crisp à la Mode, Bananas Foster Bread Pudding, Dark Chocolate Velvet Terrine","courses":[{"label":"Apps","items":["Classic French Onion Soup","Kennett Square Snapping Turtle Soup","Warren House Salad","Colossal Shrimp Cocktail (+4)"],"text":"Classic French Onion Soup, Kennett Square Snapping Turtle Soup, Warren House Salad, Colossal Shrimp Cocktail (+4)"},{"label":"Mains","items":["General Warren Famous Beef Wellington (mushroom duxelles","puff pastry","cabernet demi)","Jumbo Lump Crab Cakes","Pan Seared Salmon","Roast Duckling"],"text":"General Warren Famous Beef Wellington (mushroom duxelles, puff pastry, cabernet demi), Jumbo Lump Crab Cakes, Pan Seared Salmon, Roast Duckling"},{"label":"Dessert","items":["Warm Apple Crisp à la Mode","Bananas Foster Bread Pudding","Dark Chocolate Velvet Terrine"],"text":"Warm Apple Crisp à la Mode, Bananas Foster Bread Pudding, Dark Chocolate Velvet Terrine"}]},"rating":4.6,"reviews":300,"cuisine":"Continental / Historic Inn","address":"9 Old Lancaster Rd, Malvern, PA 19355","phone":"(610) 296-3637","menuLink":"https://assets-mainlinetoday-com.s3-accelerate.amazonaws.com/2025/09/General-Warren-Inn.pdf","website":"https://generalwarren.com","notes":"Historic 1745 carriage inn; Beef Wellington, crab cakes, fine continental cuisine","lat":40.04235,"lng":-75.52199,"photo":"https://assets.mainlinetoday.com/2024/01/mlt-cover.jpg","mltPage":"https://mainlinetoday.com/restaurant/general-warren/"}];
+
+    // Initialize Map with Google Maps Road Tiles
+    const map = L.map('map', {
+      zoomControl: false,
+      attributionControl: true
+    }).setView([40.025, -75.41], 11);
+
+    L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+      maxZoom: 20,
+      subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+      attribution: '&copy; Google Maps | Main Line Restaurant Week'
+    }).addTo(map);
+
+    // Populate Town Select
+    const towns = Array.from(new Set(RESTAURANTS.map(r => r.town))).sort();
+    const townSelect = document.getElementById('townSelect');
+    towns.forEach(t => {
+      const opt = document.createElement('option');
+      opt.value = t;
+      opt.textContent = t;
+      townSelect.appendChild(opt);
+    });
+
+    // State
+    let activeFilter = 'ALL';
+    let searchQuery = '';
+    let selectedTown = 'ALL';
+    let filteredList = [...RESTAURANTS];
+    let selectedRestId = null;
+    let activeMealTab = 'dinner'; // 'lunch' | 'dinner' | 'both'
+    let sheetMode = null; // 'detail' | 'list' | null
+    let currentSort = 'rating';
+    const markersById = new Map();
+    const markerLayer = L.layerGroup().addTo(map);
+
+    function getPinTierClass(r) {
+      const p = r.dPriceNum || r.lPriceNum || 45;
+      if (p >= 55) return 'pin-tier-high';
+      if (p >= 45) return 'pin-tier-mid';
+      return 'pin-tier-low';
+    }
+
+    function getPinLabel(r) {
+      if (r.dinnerPrice !== 'N/A' && r.lunchPrice !== 'N/A') {
+        return `${r.lunchPrice}/${r.dinnerPrice}`;
+      }
+      return r.dinnerPrice !== 'N/A' ? r.dinnerPrice : r.lunchPrice;
+    }
+
+    function renderMarkers() {
+      markerLayer.clearLayers();
+      markersById.clear();
+
+      filteredList.forEach(r => {
+        const tierClass = getPinTierClass(r);
+        const isSelected = r.id === selectedRestId;
+        const priceLabel = getPinLabel(r);
+
+        const icon = L.divIcon({
+          className: 'custom-pin-wrap',
+          html: `<div class="pin-bubble ${tierClass} ${isSelected ? 'selected' : ''}" data-id="${r.id}">
+            <span>${priceLabel}</span>
+            <span class="pin-rating">★${r.rating.toFixed(1)}</span>
+          </div>`,
+          iconSize: [0, 0],
+          iconAnchor: [0, 0]
+        });
+
+        const marker = L.marker([r.lat, r.lng], {
+          icon,
+          zIndexOffset: isSelected ? 2000 : Math.round(r.rating * 100)
+        });
+
+        marker.on('click', (e) => {
+          L.DomEvent.stopPropagation(e);
+          openRestaurantDetail(r.id, true);
+        });
+
+        marker.addTo(markerLayer);
+        markersById.set(r.id, marker);
+      });
+
+      document.getElementById('countBadge').textContent = filteredList.length;
+    }
+
+    function applyFilters(autoFit = false) {
+      const q = searchQuery.trim().toLowerCase();
+
+      filteredList = RESTAURANTS.filter(r => {
+        if (selectedTown !== 'ALL' && r.town !== selectedTown) return false;
+
+        if (activeFilter === 'TOP' && r.rating < 4.6) return false;
+        if (activeFilter === 'LUNCH' && !r.lunch.available) return false;
+        if (activeFilter === 'DINNER_45' && (!r.dinner.available || r.dPriceNum > 45)) return false;
+        if (activeFilter === 'DINNER_55' && (!r.dinner.available || r.dPriceNum < 55)) return false;
+        if (activeFilter === 'WAYNE_RADNOR' && !['Wayne', 'Radnor', 'St. Davids', 'Devon', 'Villanova', 'Haverford', 'Ardmore', 'Rosemont'].includes(r.town)) return false;
+        if (activeFilter === 'BYOB' && !(r.name.toLowerCase().includes('byob') || r.notes.toLowerCase().includes('byob') || ['At the Table', 'Fond', 'The Silverspoon', 'Avlos Greek Cuisine', 'La Belle Epoque Bistro', 'Matines Café'].includes(r.name))) return false;
+
+        if (q) {
+          const hay = [
+            r.name,
+            r.town,
+            r.cuisine,
+            r.notes,
+            r.lunch.raw,
+            r.dinner.raw
+          ].join(' ').toLowerCase();
+          if (!hay.includes(q)) return false;
+        }
+        return true;
+      });
+
+      renderMarkers();
+
+      if (autoFit && filteredList.length > 0) {
+        const bounds = L.latLngBounds(filteredList.map(r => [r.lat, r.lng]));
+        map.flyToBounds(bounds, { paddingTopLeft: [20, 120], paddingBottomRight: [20, 90], maxZoom: 14, duration: 0.5 });
+      }
+
+      if (sheetMode === 'list') {
+        renderListSheet();
+      }
+    }
+
+    function panToRestaurantOffset(r) {
+      const targetZoom = Math.max(map.getZoom(), 13);
+      const point = map.project([r.lat, r.lng], targetZoom);
+      // Offset upward so pin sits cleanly in the top 38% of the screen above the bottom sheet
+      const offsetPoint = L.point(point.x, point.y + (window.innerHeight * 0.20));
+      const targetLatLng = map.unproject(offsetPoint, targetZoom);
+      map.flyTo(targetLatLng, targetZoom, { duration: 0.45 });
+    }
+
+    function getCourseIcon(label) {
+      const l = label.toLowerCase();
+      if (l.includes('app') || l.includes('first') || l.includes('start') || l.includes('mezze') || l.includes('small')) return '🥗';
+      if (l.includes('main') || l.includes('entr') || l.includes('second') || l.includes('pizza')) return '🍽️';
+      if (l.includes('dessert') || l.includes('third') || l.includes('final')) return '🍰';
+      return '✨';
+    }
+
+    function highlightDishText(text) {
+      const q = searchQuery.trim();
+      if (!q || q.length < 2) return text;
+      const escaped = q.replace(/[.*+?^$${}()|[\]\\]/g, '\\$&');
+      const regex = new RegExp(`(${escaped})`, 'gi');
+      return text.replace(regex, '<mark style="background:#fef08a;padding:0 2px;border-radius:3px;">$1</mark>');
+    }
+
+    function renderMealBlock(mealObj, titleText) {
+      if (!mealObj || !mealObj.available) {
+        return `<div class="na-box">${mealObj ? mealObj.raw : 'Not offered for this meal'}</div>`;
+      }
+
+      const coursesHtml = mealObj.courses.map(c => {
+        const icon = getCourseIcon(c.label);
+        const q = searchQuery.trim().toLowerCase();
+        const chips = c.items.map(item => {
+          const isMatch = q.length >= 2 && item.toLowerCase().includes(q);
+          return `<span class="dish-chip ${isMatch ? 'highlight' : ''}">${highlightDishText(item)}</span>`;
+        }).join('');
+
+        return `
+          <div class="course-box">
+            <div class="course-label"><span>${icon}</span> <span>${c.label}</span></div>
+            <div class="dish-chips">${chips}</div>
+          </div>
+        `;
+      }).join('');
+
+      return `
+        <div class="meal-section-header">
+          <span class="meal-badge-title">${titleText} — ${mealObj.header || 'Prix-Fixe Menu'}</span>
+        </div>
+        <div class="course-list">
+          ${coursesHtml}
+        </div>
+      `;
+    }
+
+    function openRestaurantDetail(id, panMap = true) {
+      const r = RESTAURANTS.find(item => item.id === id);
+      if (!r) return;
+
+      selectedRestId = id;
+      sheetMode = 'detail';
+
+      // Choose default meal tab intelligently
+      if (activeFilter === 'LUNCH' && r.lunch.available) {
+        activeMealTab = 'lunch';
+      } else if (r.dinner.available) {
+        activeMealTab = 'dinner';
+      } else {
+        activeMealTab = 'lunch';
+      }
+
+      renderMarkers();
+      if (panMap) panToRestaurantOffset(r);
+
+      renderDetailContent(r);
+      document.getElementById('bottomSheet').classList.add('open');
+    }
+
+    function renderDetailContent(r) {
+      document.getElementById('detailNavArrows').style.visibility = 'visible';
+      const body = document.getElementById('sheetBody');
+      const footer = document.getElementById('sheetFooter');
+      footer.style.display = 'grid';
+
+      const bothAvailable = r.lunch.available && r.dinner.available;
+
+      let mealControlsHtml = '';
+      if (bothAvailable) {
+        mealControlsHtml = `
+          <div class="meal-tabs">
+            <button class="meal-tab-btn ${activeMealTab === 'lunch' ? 'active' : ''}" onclick="switchMealTab('lunch')">
+              ☀️ Lunch (${r.lunchPrice})
+            </button>
+            <button class="meal-tab-btn ${activeMealTab === 'dinner' ? 'active' : ''}" onclick="switchMealTab('dinner')">
+              🌙 Dinner (${r.dinnerPrice})
+            </button>
+            <button class="meal-tab-btn ${activeMealTab === 'both' ? 'active' : ''}" onclick="switchMealTab('both')">
+              📖 Both
+            </button>
+          </div>
+        `;
+      } else {
+        mealControlsHtml = `
+          <div class="meal-tabs">
+            <button class="meal-tab-btn ${r.lunch.available ? 'active' : 'disabled'}" ${r.lunch.available ? "onclick=\"switchMealTab('lunch')\"" : ''}>
+              ☀️ Lunch: ${r.lunchPrice}
+            </button>
+            <button class="meal-tab-btn ${r.dinner.available ? 'active' : 'disabled'}" ${r.dinner.available ? "onclick=\"switchMealTab('dinner')\"" : ''}>
+              🌙 Dinner: ${r.dinnerPrice}
+            </button>
+          </div>
+        `;
+      }
+
+      let menuBodyHtml = '';
+      if (activeMealTab === 'both') {
+        menuBodyHtml = renderMealBlock(r.lunch, `☀️ Lunch (${r.lunchPrice})`) + renderMealBlock(r.dinner, `🌙 Dinner (${r.dinnerPrice})`);
+      } else if (activeMealTab === 'lunch') {
+        menuBodyHtml = renderMealBlock(r.lunch, `☀️ Lunch (${r.lunchPrice})`);
+      } else {
+        menuBodyHtml = renderMealBlock(r.dinner, `🌙 Dinner (${r.dinnerPrice})`);
+      }
+
+      const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(r.name + ' ' + r.address)}`;
+      const telClean = r.phone.replace(/[^0-9+]/g, '');
+
+      body.innerHTML = `
+        <div class="rest-header">
+          ${r.photo ? `<img class="rest-thumb" src="${r.photo}" alt="${r.name}" loading="lazy" onerror="this.style.display='none'" />` : ''}
+          <div class="rest-title-block">
+            <h2 class="rest-name">${r.name}</h2>
+            <div class="badge-row">
+              <span class="badge badge-rating">★ ${r.rating.toFixed(1)} (${r.reviews})</span>
+              <span class="badge badge-town">📍 ${r.town}</span>
+              <span class="badge badge-cuisine">${r.cuisine}</span>
+            </div>
+            <div class="meta-address">${r.address}</div>
+          </div>
+        </div>
+
+        ${r.notes ? `<div class="rec-banner">💡 <strong>Note:</strong> ${r.notes}</div>` : ''}
+
+        ${mealControlsHtml}
+        ${menuBodyHtml}
+      `;
+
+      footer.innerHTML = `
+        <a class="act-btn act-btn-primary" href="${r.menuLink}" target="_blank" rel="noopener">📄 Menu PDF</a>
+        <a class="act-btn" href="${directionsUrl}" target="_blank" rel="noopener">📍 Map</a>
+        <a class="act-btn" href="${r.website}" target="_blank" rel="noopener">🌐 Site</a>
+        <a class="act-btn" href="tel:${telClean}">📞 Call</a>
+      `;
+    }
+
+    window.switchMealTab = function(tab) {
+      activeMealTab = tab;
+      const r = RESTAURANTS.find(item => item.id === selectedRestId);
+      if (r) renderDetailContent(r);
+    };
+
+    function renderListSheet() {
+      sheetMode = 'list';
+      selectedRestId = null;
+      renderMarkers();
+
+      document.getElementById('detailNavArrows').style.visibility = 'hidden';
+      const body = document.getElementById('sheetBody');
+      const footer = document.getElementById('sheetFooter');
+      footer.style.display = 'none';
+
+      const sorted = [...filteredList].sort((a, b) => {
+        if (currentSort === 'rating') return b.rating - a.rating || b.reviews - a.reviews;
+        if (currentSort === 'reviews') return b.reviews - a.reviews;
+        if (currentSort === 'price_asc') return (a.dPriceNum || a.lPriceNum || 99) - (b.dPriceNum || b.lPriceNum || 99);
+        return a.name.localeCompare(b.name);
+      });
+
+      const listHtml = sorted.map(r => {
+        const lTag = r.lunchPrice !== 'N/A' ? `<span class="price-tag price-tag-lunch">L: ${r.lunchPrice}</span>` : '';
+        const dTag = r.dinnerPrice !== 'N/A' ? `<span class="price-tag">D: ${r.dinnerPrice}</span>` : '';
+        return `
+          <div class="rest-list-item" onclick="openRestaurantDetail(${r.id}, true)">
+            ${r.photo ? `<img class="list-item-thumb" src="${r.photo}" alt="" loading="lazy" onerror="this.style.display='none'" />` : ''}
+            <div class="list-item-info">
+              <div class="list-item-title">${r.name}</div>
+              <div class="list-item-sub">📍 ${r.town} · ${r.cuisine} · ★ ${r.rating.toFixed(1)} (${r.reviews})</div>
+              <div class="badge-row">${lTag} ${dTag}</div>
+            </div>
+            <span style="color:#94a3b8;font-weight:700;font-size:18px;">›</span>
+          </div>
+        `;
+      }).join('');
+
+      body.innerHTML = `
+        <div class="list-header-row">
+          <div style="font-size:15px;font-weight:800;color:var(--slate-900);">${sorted.length} Participating Restaurants</div>
+          <select class="sort-select" id="sortSelect" onchange="changeSort(this.value)">
+            <option value="rating" ${currentSort === 'rating' ? 'selected' : ''}>Sort: Highest Rated</option>
+            <option value="reviews" ${currentSort === 'reviews' ? 'selected' : ''}>Sort: Most Reviewed</option>
+            <option value="price_asc" ${currentSort === 'price_asc' ? 'selected' : ''}>Sort: Price (Low to High)</option>
+            <option value="name" ${currentSort === 'name' ? 'selected' : ''}>Sort: Name (A–Z)</option>
+          </select>
+        </div>
+        ${listHtml || '<div class="na-box">No restaurants match your current filters.</div>'}
+      `;
+
+      document.getElementById('bottomSheet').classList.add('open');
+    }
+
+    window.changeSort = function(val) {
+      currentSort = val;
+      renderListSheet();
+    };
+
+    function closeSheet() {
+      document.getElementById('bottomSheet').classList.remove('open');
+      sheetMode = null;
+      selectedRestId = null;
+      renderMarkers();
+    }
+
+    // Event Listeners
+    document.getElementById('closeSheetBtn').addEventListener('click', closeSheet);
+    document.getElementById('closeSheetHandle').addEventListener('click', closeSheet);
+    document.getElementById('openListBtn').addEventListener('click', () => {
+      renderListSheet();
+    });
+
+    document.getElementById('prevRestBtn').addEventListener('click', () => {
+      if (!filteredList.length || !selectedRestId) return;
+      const idx = filteredList.findIndex(r => r.id === selectedRestId);
+      const prevIdx = (idx - 1 + filteredList.length) % filteredList.length;
+      openRestaurantDetail(filteredList[prevIdx].id, true);
+    });
+
+    document.getElementById('nextRestBtn').addEventListener('click', () => {
+      if (!filteredList.length || !selectedRestId) return;
+      const idx = filteredList.findIndex(r => r.id === selectedRestId);
+      const nextIdx = (idx + 1) % filteredList.length;
+      openRestaurantDetail(filteredList[nextIdx].id, true);
+    });
+
+    map.on('click', () => {
+      if (sheetMode) closeSheet();
+    });
+
+    document.getElementById('fitBoundsBtn').addEventListener('click', () => {
+      closeSheet();
+      if (filteredList.length > 0) {
+        const bounds = L.latLngBounds(filteredList.map(r => [r.lat, r.lng]));
+        map.flyToBounds(bounds, { paddingTopLeft: [20, 120], paddingBottomRight: [20, 90], maxZoom: 14, duration: 0.5 });
+      }
+    });
+
+    const searchInput = document.getElementById('searchInput');
+    const clearSearchBtn = document.getElementById('clearSearchBtn');
+
+    searchInput.addEventListener('input', (e) => {
+      searchQuery = e.target.value;
+      clearSearchBtn.style.display = searchQuery ? 'inline-flex' : 'none';
+      applyFilters(false);
+    });
+
+    clearSearchBtn.addEventListener('click', () => {
+      searchInput.value = '';
+      searchQuery = '';
+      clearSearchBtn.style.display = 'none';
+      applyFilters(false);
+    });
+
+    townSelect.addEventListener('change', (e) => {
+      selectedTown = e.target.value;
+      applyFilters(true);
+    });
+
+    document.querySelectorAll('.filter-pill').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.filter-pill').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        activeFilter = btn.dataset.filter;
+        applyFilters(true);
+      });
+    });
+
+    // Initial render
+    applyFilters(true);
+  </script>
+</body>
+</html>

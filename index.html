@@ -245,20 +245,33 @@
     .pin-bubble {
       display: inline-flex;
       align-items: center;
-      gap: 4px;
-      padding: 4px 8px;
+      gap: 5px;
+      padding: 4px 9px;
       border-radius: 999px;
       font-family: 'Inter', sans-serif;
       font-size: 11px;
       font-weight: 700;
       color: #fff;
       white-space: nowrap;
-      box-shadow: 0 3px 8px rgba(0, 0, 0, 0.28);
-      border: 2px solid #fff;
+      box-shadow: 0 3px 10px rgba(0, 0, 0, 0.30);
+      border: 1.8px solid #fff;
       transform: translate(-50%, -50%);
       transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.18s ease;
       cursor: pointer;
       position: relative;
+    }
+
+    .pin-name {
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+
+    .pin-price-badge {
+      background: rgba(0, 0, 0, 0.24);
+      padding: 1px 5px;
+      border-radius: 999px;
+      font-size: 10px;
+      font-weight: 700;
     }
 
     .pin-bubble::after {
@@ -856,6 +869,35 @@
       return 'pin-tier-low';
     }
 
+    function getShortPinName(name) {
+      const map = {
+        "Limoncello, Chester Springs": "Limoncello (CS)",
+        "Limoncello, West Chester": "Limoncello (WC)",
+        "NAPA Kitchen and Wine": "NAPA Kitchen",
+        "Southern Cross Kitchen": "Southern Cross",
+        "Maris Mediterranean": "Maris",
+        "Avlos Greek Cuisine": "Avlos",
+        "Terrain Cafe - Doylestown": "Terrain (Doylestown)",
+        "Terrain Cafe - Devon": "Terrain (Devon)",
+        "Terrain Café - Glen Mills": "Terrain (Glen Mills)",
+        "White Dog Cafe Chester Springs": "White Dog (CS)",
+        "White Dog Cafe Glen Mills": "White Dog (GM)",
+        "White Dog Cafe Haverford": "White Dog (Haverford)",
+        "White Dog Cafe Wayne": "White Dog (Wayne)",
+        "The Farmer's Daughter Bar & Restaurant": "Farmer's Daughter",
+        "Fork & Bottle at The Desmond": "Fork & Bottle",
+        "Streetlight Kitchen & Bar": "Streetlight",
+        "Agave Mexican Cuisine": "Agave",
+        "Pizzeria Vetri King of Prussia": "Vetri (KOP)",
+        "Pizzeria Vetri Devon": "Vetri (Devon)",
+        "Autograph Brasserie": "Autograph",
+        "Ryan Christopher's BYOB": "Ryan Christopher's",
+        "La Belle Epoque Bistro": "La Belle Epoque",
+        "Tavola Restaurant & Bar": "Tavola"
+      };
+      return map[name] || name;
+    }
+
     function getPinLabel(r) {
       if (r.dinnerPrice !== 'N/A' && r.lunchPrice !== 'N/A') {
         return `${r.lunchPrice}/${r.dinnerPrice}`;
@@ -872,10 +914,12 @@
         const isSelected = r.id === selectedRestId;
         const priceLabel = getPinLabel(r);
 
+        const shortName = getShortPinName(r.name);
         const icon = L.divIcon({
           className: 'custom-pin-wrap',
           html: `<div class="pin-bubble ${tierClass} ${isSelected ? 'selected' : ''}" data-id="${r.id}">
-            <span>${priceLabel}</span>
+            <span class="pin-name">${shortName}</span>
+            <span class="pin-price-badge">${priceLabel}</span>
             <span class="pin-rating">★${r.rating.toFixed(1)}</span>
           </div>`,
           iconSize: [0, 0],
